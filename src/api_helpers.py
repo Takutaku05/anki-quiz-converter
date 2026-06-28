@@ -1,0 +1,27 @@
+from __future__ import annotations
+
+import re
+
+
+def japanese_error_message(error: Exception) -> str:
+    message = str(error)
+    if "deck name could not be extracted" in message:
+        return "タイトルからデッキ名を抽出できません。"
+    if "no question blocks were found" in message:
+        return "問題ブロックが見つかりません。"
+    if "no answer choices were found" in message:
+        return "解答選択肢が見つかりません。"
+    if "unsupported answer marker" in message:
+        return "対応していない解答記号が含まれています。"
+    return "変換に失敗しました。入力内容を確認してください。"
+
+
+def count_tsv_cards(tsv: str) -> int:
+    return sum(1 for line in tsv.splitlines() if line and not line.startswith("#"))
+
+
+def build_download_filename(deck: str, extension: str) -> str:
+    safe_name = re.sub(r'[\\/:*?"<>|\s]+', "_", deck).strip("._")
+    if not safe_name:
+        safe_name = "anki_cards"
+    return f"{safe_name}.{extension.lstrip('.')}"
