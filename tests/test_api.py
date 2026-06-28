@@ -1,15 +1,14 @@
 import os
 import unittest
-from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 import src.api as api_module
 from src.api import create_app
 from src.r2_storage import DownloadLink
+from sample_data import SAMPLE_SOURCE
 
 
-ROOT = Path(__file__).resolve().parents[1]
 R2_ENV_KEYS = [
     "R2_ACCOUNT_ID",
     "R2_ACCESS_KEY_ID",
@@ -35,18 +34,14 @@ class ApiTests(unittest.TestCase):
         self.client = TestClient(create_app())
 
     def test_convert_returns_tsv_without_r2_settings(self):
-        source = (ROOT / "example" / "sauce" / "アレルギー疾患治療薬.txt").read_text(
-            encoding="utf-8"
-        )
-
         response = self.client.post(
             "/api/convert",
-            json={"source": source, "create_download_link": True},
+            json={"source": SAMPLE_SOURCE, "create_download_link": True},
         )
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data["deck"], "薬理学Ⅲ::アレルギー疾患治療薬")
+        self.assertEqual(data["deck"], "薬理学Ⅲ::テスト単元")
         self.assertGreater(data["card_count"], 0)
         self.assertTrue(data["tsv"].startswith("#separator:Tab"))
         self.assertIsNone(data["downloads"]["apkg"])
@@ -99,20 +94,17 @@ class ApiTests(unittest.TestCase):
 
         fake_store = FakeStore()
         api_module.R2DownloadStore.from_env = classmethod(lambda cls: fake_store)
-        source = (ROOT / "example" / "sauce" / "アレルギー疾患治療薬.txt").read_text(
-            encoding="utf-8"
-        )
 
         response = self.client.post(
             "/api/convert",
-            json={"source": source, "create_download_link": True},
+            json={"source": SAMPLE_SOURCE, "create_download_link": True},
         )
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data["downloads"]["apkg"]["filename"], "薬理学Ⅲ_アレルギー疾患治療薬.apkg")
+        self.assertEqual(data["downloads"]["apkg"]["filename"], "薬理学Ⅲ_テスト単元.apkg")
         self.assertIsNone(data["downloads"]["tsv"])
-        self.assertEqual(fake_store.upload["filename"], "薬理学Ⅲ_アレルギー疾患治療薬.apkg")
+        self.assertEqual(fake_store.upload["filename"], "薬理学Ⅲ_テスト単元.apkg")
         self.assertEqual(fake_store.upload["content_type"], "application/octet-stream")
         self.assertTrue(fake_store.upload["content"].startswith(b"PK"))
 

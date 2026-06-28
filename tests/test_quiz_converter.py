@@ -1,23 +1,12 @@
-from pathlib import Path
 import unittest
 
-
 from src.quiz_converter import convert_text
-
-
-ROOT = Path(__file__).resolve().parents[1]
+from sample_data import SAMPLE_SOURCE, SAMPLE_TSV
 
 
 class QuizConverterTests(unittest.TestCase):
     def test_convert_text_matches_example_output(self):
-        source = (ROOT / "example" / "sauce" / "アレルギー疾患治療薬.txt").read_text(
-            encoding="utf-8"
-        )
-        expected = (ROOT / "example" / "output" / "アレルギー疾患治療薬.tsv").read_text(
-            encoding="utf-8"
-        )
-
-        self.assertEqual(convert_text(source), expected)
+        self.assertEqual(convert_text(SAMPLE_SOURCE), SAMPLE_TSV)
 
     def test_convert_text_reports_missing_deck_title(self):
         with self.assertRaisesRegex(ValueError, "deck name could not be extracted"):
