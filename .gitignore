@@ -9,3 +9,4 @@ dist/
 .env
 web/.env
 DEPLOY_NOTES.md
+.claude/*
