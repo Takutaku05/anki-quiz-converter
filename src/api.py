@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import os
+import sys
 from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -11,6 +13,9 @@ from .apkg_builder import build_apkg_bytes
 from .api_helpers import build_download_filename, count_tsv_cards, japanese_error_message
 from .download_store import DownloadLink, InMemoryDownloadStore
 from .quiz_converter import convert_text, extract_deck, remove_ignored_urls
+
+
+LOGGER = logging.getLogger("anki_quiz_converter.api")
 
 
 class ConvertRequest(BaseModel):
@@ -39,6 +44,7 @@ class CapabilitiesResponse(BaseModel):
 
 
 def create_app(store: InMemoryDownloadStore | None = None) -> FastAPI:
+    _configure_logging()
     app = FastAPI(title="Anki Quiz Converter", version="0.2.0")
     app.add_middleware(
         CORSMiddleware,
@@ -48,6 +54,22 @@ def create_app(store: InMemoryDownloadStore | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     download_store = store or InMemoryDownloadStore.from_env()
+
+    @app.middleware("http")
+    async def log_unhandled_errors(request: Request, call_next):
+        try:
+            return await call_next(request)
+        except HTTPException:
+            raise
+        except Exception:
+            client = request.client.host if request.client else "unknown"
+            LOGGER.exception(
+                "Unhandled API error method=%s path=%s client=%s",
+                request.method,
+                request.url.path,
+                client,
+            )
+            raise
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
@@ -114,6 +136,27 @@ def create_app(store: InMemoryDownloadStore | None = None) -> FastAPI:
         )
 
     return app
+
+
+def _configure_logging() -> None:
+    if not LOGGER.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s %(levelname)s %(name)s %(message)s",
+                datefmt="%Y-%m-%dT%H:%M:%S%z",
+            )
+        )
+        LOGGER.addHandler(handler)
+
+    level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
+    try:
+        LOGGER.setLevel(level_name)
+    except ValueError:
+        LOGGER.warning("Invalid LOG_LEVEL=%r; falling back to INFO", level_name)
+        LOGGER.setLevel(logging.INFO)
+
+    LOGGER.propagate = False
 
 
 def _cors_origins() -> list[str]:

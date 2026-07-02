@@ -1,8 +1,11 @@
+import logging
+import os
 import unittest
+from unittest import mock
 
 from fastapi.testclient import TestClient
 
-from src.api import create_app
+from src.api import LOGGER, create_app
 from src.download_store import InMemoryDownloadStore
 from sample_data import SAMPLE_SOURCE
 
@@ -73,6 +76,65 @@ class ApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"], "タイトルからデッキ名を抽出できません。")
+
+    def test_unhandled_errors_are_logged(self):
+        app = create_app(store=self.store)
+
+        @app.get("/api/boom")
+        def boom():
+            raise RuntimeError("boom")
+
+        client = TestClient(app)
+
+        with self.assertLogs("anki_quiz_converter.api", level="ERROR") as logs:
+            with self.assertRaises(RuntimeError):
+                client.get("/api/boom")
+
+        output = "\n".join(logs.output)
+        self.assertIn("Unhandled API error method=GET path=/api/boom", output)
+        self.assertIn("RuntimeError: boom", output)
+
+    def test_http_exceptions_are_not_logged_as_unhandled(self):
+        with self.assertNoLogs("anki_quiz_converter.api", level="ERROR"):
+            response = self.client.get("/api/download/unknown-token")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_invalid_log_level_falls_back_to_info(self):
+        original_level = LOGGER.level
+        self.addCleanup(LOGGER.setLevel, original_level)
+
+        with mock.patch.dict(os.environ, {"LOG_LEVEL": "not-a-level"}):
+            create_app(store=self.store)
+
+        self.assertEqual(LOGGER.level, logging.INFO)
+
+    def test_log_level_is_reapplied_when_handler_already_configured(self):
+        original_level = LOGGER.level
+        self.addCleanup(LOGGER.setLevel, original_level)
+        self.assertTrue(LOGGER.handlers, "expected a handler from an earlier create_app() call")
+
+        with mock.patch.dict(os.environ, {"LOG_LEVEL": "DEBUG"}):
+            create_app(store=self.store)
+
+        self.assertEqual(LOGGER.level, logging.DEBUG)
+
+    def test_error_logger_format_includes_timestamp(self):
+        formatter = LOGGER.handlers[0].formatter
+        record = logging.LogRecord(
+            name=LOGGER.name,
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="sample error",
+            args=(),
+            exc_info=None,
+        )
+
+        formatted = formatter.format(record)
+
+        self.assertRegex(formatted, r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
+        self.assertIn("ERROR anki_quiz_converter.api sample error", formatted)
 
 
 if __name__ == "__main__":
