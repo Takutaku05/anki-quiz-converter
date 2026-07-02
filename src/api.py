@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import os
+from urllib.parse import quote
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .apkg_builder import build_apkg_bytes
 from .api_helpers import build_download_filename, count_tsv_cards, japanese_error_message
+from .download_store import DownloadLink, InMemoryDownloadStore
 from .quiz_converter import convert_text, extract_deck, remove_ignored_urls
-from .r2_storage import DownloadLink, R2DownloadStore
 
 
 class ConvertRequest(BaseModel):
@@ -37,8 +38,8 @@ class CapabilitiesResponse(BaseModel):
     link_ttl_seconds: int | None
 
 
-def create_app() -> FastAPI:
-    app = FastAPI(title="Anki Quiz Converter", version="0.1.0")
+def create_app(store: InMemoryDownloadStore | None = None) -> FastAPI:
+    app = FastAPI(title="Anki Quiz Converter", version="0.2.0")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_cors_origins(),
@@ -46,6 +47,7 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
+    download_store = store or InMemoryDownloadStore.from_env()
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
@@ -54,12 +56,12 @@ def create_app() -> FastAPI:
     @app.get("/api/capabilities", response_model=CapabilitiesResponse)
     def capabilities() -> CapabilitiesResponse:
         return CapabilitiesResponse(
-            apkg_download_links_enabled=_r2_settings_available(),
-            link_ttl_seconds=_r2_link_ttl_seconds() if _r2_settings_available() else None,
+            apkg_download_links_enabled=True,
+            link_ttl_seconds=download_store.expires_in_seconds,
         )
 
     @app.post("/api/convert", response_model=ConvertResponse)
-    def convert(request: ConvertRequest) -> ConvertResponse:
+    def convert(request: ConvertRequest, http_request: Request) -> ConvertResponse:
         try:
             cleaned = remove_ignored_urls(request.source)
             deck = extract_deck(cleaned)
@@ -69,21 +71,20 @@ def create_app() -> FastAPI:
 
         tsv_filename = build_download_filename(deck, "tsv")
         apkg_filename = build_download_filename(deck, "apkg")
-        warnings: list[str] = []
         apkg_link: DownloadLink | None = None
 
         if request.create_download_link:
-            store = R2DownloadStore.from_env()
-            if store is None:
-                warnings.append(
-                    "R2設定が未設定のため、期限付きダウンロードリンクは作成されませんでした。"
-                )
-            else:
-                apkg_link = store.upload_download(
-                    content=build_apkg_bytes(deck, tsv),
-                    filename=apkg_filename,
-                    content_type="application/octet-stream",
-                )
+            token, expires_at = download_store.put(
+                content=build_apkg_bytes(deck, tsv),
+                filename=apkg_filename,
+                content_type="application/octet-stream",
+            )
+            apkg_link = DownloadLink(
+                url=f"{_public_base_url(http_request)}/api/download/{token}",
+                filename=apkg_filename,
+                expires_at=expires_at.isoformat(),
+                expires_in_seconds=download_store.expires_in_seconds,
+            )
 
         return ConvertResponse(
             deck=deck,
@@ -92,7 +93,24 @@ def create_app() -> FastAPI:
             tsv_filename=tsv_filename,
             apkg_filename=apkg_filename,
             downloads=Downloads(apkg=apkg_link),
-            warnings=warnings,
+            warnings=[],
+        )
+
+    @app.get("/api/download/{token}")
+    def download(token: str) -> Response:
+        stored = download_store.get(token)
+        if stored is None:
+            raise HTTPException(
+                status_code=404,
+                detail="リンクが無効か、有効期限が切れています。もう一度変換してください。",
+            )
+        return Response(
+            content=stored.content,
+            media_type=stored.content_type,
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{quote(stored.filename)}",
+                "Cache-Control": "no-store",
+            },
         )
 
     return app
@@ -103,20 +121,11 @@ def _cors_origins() -> list[str]:
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
-def _r2_settings_available() -> bool:
-    return all(
-        os.environ.get(key)
-        for key in [
-            "R2_ACCOUNT_ID",
-            "R2_ACCESS_KEY_ID",
-            "R2_SECRET_ACCESS_KEY",
-            "R2_BUCKET_NAME",
-        ]
-    )
-
-
-def _r2_link_ttl_seconds() -> int:
-    return int(os.environ.get("R2_LINK_TTL_SECONDS", str(60 * 60 * 24)))
+def _public_base_url(request: Request) -> str:
+    configured = os.environ.get("PUBLIC_BASE_URL", "").strip()
+    if configured:
+        return configured.rstrip("/")
+    return str(request.base_url).rstrip("/")
 
 
 app = create_app()
