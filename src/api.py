@@ -139,17 +139,15 @@ def create_app(store: InMemoryDownloadStore | None = None) -> FastAPI:
 
 
 def _configure_logging() -> None:
-    if LOGGER.handlers:
-        return
-
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s %(levelname)s %(name)s %(message)s",
-            datefmt="%Y-%m-%dT%H:%M:%S%z",
+    if not LOGGER.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s %(levelname)s %(name)s %(message)s",
+                datefmt="%Y-%m-%dT%H:%M:%S%z",
+            )
         )
-    )
-    LOGGER.addHandler(handler)
+        LOGGER.addHandler(handler)
 
     level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
     try:
