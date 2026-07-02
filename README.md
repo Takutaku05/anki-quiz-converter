@@ -6,7 +6,7 @@
 
 - `src/quiz_converter.py`: 既存の変換ロジック
 - `src/api.py`: FastAPI API
-- `src/r2_storage.py`: Cloudflare R2へアップロードし、署名付きURLを発行
+- `src/download_store.py`: 変換した.apkgをサーバーメモリに一時保存し、トークン付きURLで配信
 - `web/`: Cloudflare Pages向けReact/Viteフロントエンド
 - `tests/`: 標準ライブラリ `unittest` で走る最低限のテスト
 
@@ -32,21 +32,24 @@ npm run dev
 
 ## 期限付きダウンロードリンク
 
-`POST /api/convert` は、R2設定が揃っている場合にAPKGをR2へ保存し、署名付きURLを返します。設定がない場合も変換自体は成功し、ブラウザ内でTSVをダウンロードできます。
+`POST /api/convert` は、APKGをサーバーメモリに一時保存し、`GET /api/download/{token}` のURLを返します。外部ストレージ（R2など）は不要です。
+
+- リンクの有効期限は `DOWNLOAD_LINK_TTL_SECONDS`（デフォルト30分）
+- サーバー再起動やスリープ（Render無料プラン）でリンクは無効になります。その場合は再変換してください
+- フロントエンドはURLのQRコードを表示するので、PCで変換してスマホのAnkiアプリでインポートできます
 
 必要な環境変数:
 
 ```bash
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,https://your-pages-domain.pages.dev
-R2_ACCOUNT_ID=your_cloudflare_account_id
-R2_ACCESS_KEY_ID=your_r2_access_key_id
-R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
-R2_BUCKET_NAME=your_r2_bucket_name
-R2_PUBLIC_PREFIX=generated
-R2_LINK_TTL_SECONDS=86400
+
+# プロキシ配下（Renderなど）ではダウンロードURLの組み立てに使うため明示推奨
+PUBLIC_BASE_URL=https://your-api-domain.example.com
+DOWNLOAD_LINK_TTL_SECONDS=1800
+DOWNLOAD_MAX_ENTRIES=100
 ```
 
-リンクはAPKGファイルへの署名付きURLです。リンクを知っている人は、有効期限内であればファイルをダウンロードできます。
+リンクはトークン付きURLです。リンクを知っている人は、有効期限内であればファイルをダウンロードできます。
 
 ## Cloudflare Pages
 
@@ -59,7 +62,7 @@ Cloudflare Pagesには `web/` をデプロイします。
 
 ## FastAPIデプロイ
 
-`render.yaml` を追加しています。Renderにデプロイする場合は、上記のR2環境変数と `CORS_ORIGINS` を設定してください。
+`render.yaml` を追加しています。Renderにデプロイする場合は、`CORS_ORIGINS` と `PUBLIC_BASE_URL` を設定してください。
 
 start command:
 
@@ -91,15 +94,17 @@ Content-Type: application/json
   "downloads": {
     "tsv": null,
     "apkg": {
-      "url": "https://...",
+      "url": "https://your-api-domain.example.com/api/download/xxxxxxxx",
       "filename": "薬理学Ⅲ_アレルギー疾患治療薬.apkg",
-      "expires_at": "2026-06-29T12:00:00+00:00",
-      "expires_in_seconds": 86400
+      "expires_at": "2026-07-02T12:30:00+00:00",
+      "expires_in_seconds": 1800
     }
   },
   "warnings": []
 }
 ```
+
+`GET /api/download/{token}` は有効期限内であれば.apkgバイナリを返します。期限切れ・不明トークンは404と日本語メッセージを返します。
 
 変換失敗時は日本語メッセージを返します。
 

@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 import unittest
 
 from src.api_helpers import (
@@ -6,18 +5,6 @@ from src.api_helpers import (
     count_tsv_cards,
     japanese_error_message,
 )
-from src.r2_storage import R2DownloadStore, R2Settings
-
-
-class FakeS3Client:
-    def __init__(self):
-        self.put_kwargs = None
-
-    def put_object(self, **kwargs):
-        self.put_kwargs = kwargs
-
-    def generate_presigned_url(self, client_method, Params, ExpiresIn):
-        return f"https://download.example/{Params['Key']}?expires={ExpiresIn}&method={client_method}"
 
 
 class ApiHelperTests(unittest.TestCase):
@@ -54,39 +41,6 @@ class ApiHelperTests(unittest.TestCase):
             build_download_filename("薬理学Ⅲ::消化器/潰瘍", "tsv"),
             "薬理学Ⅲ_消化器_潰瘍.tsv",
         )
-
-    def test_r2_download_store_uploads_and_returns_presigned_url(self):
-        client = FakeS3Client()
-        store = R2DownloadStore(
-            settings=R2Settings(
-                bucket_name="anki-files",
-                public_prefix="generated",
-                expires_in_seconds=3600,
-            ),
-            client=client,
-            now=lambda: datetime(2026, 6, 28, 12, 0, tzinfo=UTC),
-        )
-
-        link = store.upload_download(
-            content=b"statement\tanswer\ttag\n",
-            filename="薬理学.tsv",
-            content_type="text/tab-separated-values; charset=utf-8",
-        )
-
-        self.assertEqual(client.put_kwargs["Bucket"], "anki-files")
-        self.assertEqual(client.put_kwargs["Body"], b"statement\tanswer\ttag\n")
-        self.assertEqual(
-            client.put_kwargs["ContentType"],
-            "text/tab-separated-values; charset=utf-8",
-        )
-        self.assertTrue(
-            client.put_kwargs["ContentDisposition"].startswith(
-                "attachment; filename*=UTF-8''"
-            )
-        )
-        self.assertTrue(link.url.startswith("https://download.example/generated/"))
-        self.assertEqual(link.filename, "薬理学.tsv")
-        self.assertEqual(link.expires_in_seconds, 3600)
 
 
 if __name__ == "__main__":

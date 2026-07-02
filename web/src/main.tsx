@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CheckCircle2, Copy, Download, ExternalLink, Loader2, RotateCcw } from "lucide-react";
+import { CheckCircle2, Copy, Download, ExternalLink, Link2, Loader2, RotateCcw } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import "./styles.css";
 
 type DownloadLink = {
@@ -37,6 +38,7 @@ function App() {
   const [isConverting, setIsConverting] = useState(false);
   const [createDownloadLink, setCreateDownloadLink] = useState(true);
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse | null>(null);
+  const [apkgUrlCopied, setApkgUrlCopied] = useState(false);
 
   const canConvert = source.trim().length > 0 && !isConverting;
   const canCreateApkgLink = capabilities?.apkg_download_links_enabled === true;
@@ -115,6 +117,14 @@ function App() {
     await navigator.clipboard.writeText(result.tsv);
   }
 
+  async function copyApkgUrl() {
+    const url = result?.downloads.apkg?.url;
+    if (!url) return;
+    await navigator.clipboard.writeText(url);
+    setApkgUrlCopied(true);
+    window.setTimeout(() => setApkgUrlCopied(false), 2000);
+  }
+
   function reset() {
     setSource("");
     setResult(null);
@@ -132,7 +142,7 @@ function App() {
         </header>
 
         <div className="notice" role="note">
-          入力された問題文は変換処理のためサーバーに送信されます。リンク作成をONにすると、Anki用の.apkgファイルが期限付きダウンロードリンクとして一時的に保存されます。
+          入力された問題文は変換処理のためサーバーに送信されます。リンク作成をONにすると、.apkgファイルがサーバーに一時保存され、期限付きダウンロードURLが発行されます。URLをAnkiアプリの「共有デッキのダウンロード」に貼るか、スマホでQRコードを読み取ってインポートできます。
         </div>
 
         <div className="grid">
@@ -149,7 +159,7 @@ function App() {
                   onChange={(event) => setCreateDownloadLink(event.target.checked)}
                   type="checkbox"
                 />
-                <span>{canCreateApkgLink ? "APKGリンク作成" : "R2未設定"}</span>
+                <span>{canCreateApkgLink ? "APKGリンク作成" : "リンク作成不可"}</span>
               </label>
             </div>
 
@@ -197,7 +207,7 @@ function App() {
                 href={result?.downloads.apkg?.url ?? "#"}
                 rel="noreferrer"
                 target="_blank"
-                title={result?.downloads.apkg ? "APKGの期限付きリンクを開く" : "APKGリンク作成がOFF、またはR2設定が未設定です"}
+                title={result?.downloads.apkg ? "APKGの期限付きリンクを開く" : "APKGリンク作成がOFFです"}
               >
                 <ExternalLink size={18} aria-hidden="true" />
                 <span>{result?.downloads.apkg ? "APKGリンクを開く" : "APKGリンク未作成"}</span>
@@ -209,10 +219,22 @@ function App() {
             ))}
 
             {result?.downloads.apkg ? (
-              <div className="link-meta">
-                <span>{result.downloads.apkg.filename}</span>
-                <span>有効期限: {new Date(result.downloads.apkg.expires_at).toLocaleString("ja-JP")}</span>
-              </div>
+              <>
+                <div className="link-meta">
+                  <span>{result.downloads.apkg.filename}</span>
+                  <span>有効期限: {new Date(result.downloads.apkg.expires_at).toLocaleString("ja-JP")}</span>
+                </div>
+                <div className="qr-box">
+                  <QRCodeSVG size={148} value={result.downloads.apkg.url} />
+                  <div className="qr-help">
+                    <p>スマホでQRコードを読み取るか、URLをコピーしてAnkiアプリに貼り付けてください。</p>
+                    <button className="secondary-button" onClick={copyApkgUrl} type="button">
+                      <Link2 size={18} aria-hidden="true" />
+                      <span>{apkgUrlCopied ? "コピーしました" : "URLをコピー"}</span>
+                    </button>
+                  </div>
+                </div>
+              </>
             ) : null}
 
             <pre className="preview" aria-label="TSVプレビュー">

@@ -231,6 +231,28 @@ button:disabled,
   padding: 10px 12px;
 }
 
+.qr-box {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d7ded8;
+  border-radius: 8px;
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 14px;
+}
+
+.qr-help {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qr-help p {
+  color: #475753;
+  font-size: 0.9rem;
+}
+
 .preview {
   background: #18201f;
   border-radius: 8px;

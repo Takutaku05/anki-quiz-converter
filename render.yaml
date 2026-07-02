@@ -8,15 +8,9 @@ services:
     envVars:
       - key: CORS_ORIGINS
         sync: false
-      - key: R2_ACCOUNT_ID
+      - key: PUBLIC_BASE_URL
         sync: false
-      - key: R2_ACCESS_KEY_ID
-        sync: false
-      - key: R2_SECRET_ACCESS_KEY
-        sync: false
-      - key: R2_BUCKET_NAME
-        sync: false
-      - key: R2_PUBLIC_PREFIX
-        value: generated
-      - key: R2_LINK_TTL_SECONDS
-        value: "86400"
+      - key: DOWNLOAD_LINK_TTL_SECONDS
+        value: "1800"
+      - key: DOWNLOAD_MAX_ENTRIES
+        value: "100"
