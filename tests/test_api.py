@@ -1,5 +1,7 @@
 import logging
+import os
 import unittest
+from unittest import mock
 
 from fastapi.testclient import TestClient
 
@@ -91,6 +93,24 @@ class ApiTests(unittest.TestCase):
         output = "\n".join(logs.output)
         self.assertIn("Unhandled API error method=GET path=/api/boom", output)
         self.assertIn("RuntimeError: boom", output)
+
+    def test_http_exceptions_are_not_logged_as_unhandled(self):
+        with self.assertNoLogs("anki_quiz_converter.api", level="ERROR"):
+            response = self.client.get("/api/download/unknown-token")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_invalid_log_level_falls_back_to_info(self):
+        original_handlers = LOGGER.handlers[:]
+        original_level = LOGGER.level
+        self.addCleanup(setattr, LOGGER, "handlers", original_handlers)
+        self.addCleanup(LOGGER.setLevel, original_level)
+        LOGGER.handlers = []
+
+        with mock.patch.dict(os.environ, {"LOG_LEVEL": "not-a-level"}):
+            create_app(store=self.store)
+
+        self.assertEqual(LOGGER.level, logging.INFO)
 
     def test_error_logger_format_includes_timestamp(self):
         formatter = LOGGER.handlers[0].formatter

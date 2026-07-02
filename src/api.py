@@ -59,6 +59,8 @@ def create_app(store: InMemoryDownloadStore | None = None) -> FastAPI:
     async def log_unhandled_errors(request: Request, call_next):
         try:
             return await call_next(request)
+        except HTTPException:
+            raise
         except Exception:
             client = request.client.host if request.client else "unknown"
             LOGGER.exception(
@@ -148,7 +150,14 @@ def _configure_logging() -> None:
         )
     )
     LOGGER.addHandler(handler)
-    LOGGER.setLevel(os.environ.get("LOG_LEVEL", "INFO").upper())
+
+    level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
+    try:
+        LOGGER.setLevel(level_name)
+    except ValueError:
+        LOGGER.warning("Invalid LOG_LEVEL=%r; falling back to INFO", level_name)
+        LOGGER.setLevel(logging.INFO)
+
     LOGGER.propagate = False
 
 
