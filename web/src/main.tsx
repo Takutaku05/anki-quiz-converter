@@ -5,7 +5,6 @@ import {
   Copy,
   Download,
   ExternalLink,
-  Layers,
   Link2,
   Loader2,
   RotateCcw,
@@ -159,7 +158,37 @@ function App() {
         <header className="hero">
           <p className="brand">
             <span className="brand-badge" aria-hidden="true">
-              <Layers size={18} />
+              <svg viewBox="0 0 24 24" width="23" height="23" role="img">
+                {/* 重ねた暗記カードと、正誤問題の「○」印 */}
+                <rect
+                  x="6.5"
+                  y="4.5"
+                  width="12"
+                  height="15.5"
+                  rx="2.4"
+                  transform="rotate(9 12 12)"
+                  fill="#ffffff"
+                  opacity="0.5"
+                />
+                <rect
+                  x="5.5"
+                  y="4"
+                  width="12"
+                  height="15.5"
+                  rx="2.4"
+                  transform="rotate(-8 12 12)"
+                  fill="#ffffff"
+                />
+                <circle
+                  cx="11.5"
+                  cy="11.75"
+                  r="3.3"
+                  transform="rotate(-8 12 12)"
+                  fill="none"
+                  stroke="#ec7b2e"
+                  strokeWidth="1.8"
+                />
+              </svg>
             </span>
             Anki Quiz Converter
           </p>
@@ -188,7 +217,7 @@ function App() {
             <div className="panel-head">
               <div>
                 <h2 id="input-title">問題テキスト</h2>
-                <p>NotebookLMなどからコピーした演習問題解答をそのまま貼り付けます。</p>
+                <p>コピーした演習問題解答をそのまま貼り付けます。</p>
               </div>
               <label className="toggle">
                 <input
