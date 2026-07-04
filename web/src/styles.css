@@ -1,10 +1,21 @@
 :root {
-  color: #18201f;
-  background: #f5f7f4;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  line-height: 1.5;
+  /* 温かみのある学習アプリ配色 */
+  --kinari: #fbf3e7; /* 生成り: ページ背景 */
+  --card: #fffdf9; /* カード面 */
+  --ink: #46352a; /* 焦げ茶: 本文 */
+  --ink-soft: #8b7663; /* 薄茶: 補足テキスト */
+  --mikan: #ec7b2e; /* 蜜柑: 主ボタン */
+  --mikan-deep: #c25e17; /* 蜜柑の影 */
+  --honey: #ffd98a; /* 蜂蜜: マーカー・アクセント */
+  --matcha: #5e8c53; /* 抹茶: 成功表示 */
+  --line: #ebdcc6; /* 罫線 */
+  --ring-metal: #c5ae8e; /* 単語カードのリング */
+  --preview-bg: #362a1f;
+
+  color: var(--ink);
+  background: var(--kinari);
+  font-family: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.6;
 }
 
 * {
@@ -20,74 +31,152 @@ textarea {
   font: inherit;
 }
 
-.app-shell {
-  min-height: 100vh;
-  padding: 28px;
-}
-
-.workspace {
-  margin: 0 auto;
-  max-width: 1280px;
-}
-
-.topbar {
-  align-items: end;
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 18px;
-}
-
-.eyebrow {
-  color: #5d6d6a;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  margin: 0 0 4px;
-  text-transform: uppercase;
-}
-
 h1,
 h2,
 p {
   margin: 0;
 }
 
+.app-shell {
+  min-height: 100vh;
+  padding: 20px 16px 40px;
+}
+
+.workspace {
+  margin: 0 auto;
+  max-width: 1180px;
+}
+
+/* ---- ヒーロー ---- */
+
+.hero {
+  margin-bottom: 30px;
+}
+
+.brand {
+  align-items: center;
+  color: var(--ink-soft);
+  display: flex;
+  font-family: "Zen Maru Gothic", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  gap: 8px;
+  letter-spacing: 0.04em;
+  margin-bottom: 14px;
+}
+
+.brand-badge {
+  align-items: center;
+  background: var(--mikan);
+  border-radius: 12px;
+  box-shadow: 0 2px 0 var(--mikan-deep);
+  color: #fff;
+  display: inline-flex;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
 h1 {
-  font-size: clamp(1.7rem, 3vw, 2.6rem);
-  line-height: 1.15;
+  font-family: "Zen Maru Gothic", sans-serif;
+  font-size: clamp(1.55rem, 4.5vw, 2.4rem);
+  font-weight: 900;
+  line-height: 1.3;
 }
 
-h2 {
-  font-size: 1.05rem;
+h1 mark {
+  background: linear-gradient(transparent 62%, var(--honey) 62%);
+  color: inherit;
 }
 
-.notice,
-.panel,
-.error-box,
-.warning-box {
-  border: 1px solid #d7ded8;
+.lead {
+  color: var(--ink-soft);
+  font-size: 0.98rem;
+  margin-top: 10px;
+  max-width: 40em;
 }
 
-.notice {
-  background: #eef6f3;
-  border-radius: 8px;
-  color: #23413c;
-  margin-bottom: 18px;
-  padding: 12px 14px;
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 26px;
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
 }
+
+.steps li {
+  align-items: center;
+  color: var(--ink);
+  display: flex;
+  font-size: 0.92rem;
+  font-weight: 500;
+  gap: 9px;
+}
+
+.step-num {
+  align-items: center;
+  background: var(--honey);
+  border-radius: 50%;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-family: "Zen Maru Gothic", sans-serif;
+  font-weight: 900;
+  height: 27px;
+  justify-content: center;
+  width: 27px;
+}
+
+/* ---- 単語カード風パネル ---- */
 
 .grid {
   display: grid;
-  gap: 18px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 26px 22px;
+  grid-template-columns: 1fr;
+  margin-top: 18px;
+}
+
+@media (min-width: 901px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
 }
 
 .panel {
-  background: #ffffff;
-  border-radius: 8px;
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 20px;
+  box-shadow:
+    0 1px 2px rgba(70, 53, 42, 0.05),
+    0 10px 28px rgba(70, 53, 42, 0.07);
   min-width: 0;
-  padding: 18px;
+  padding: 24px 20px 20px;
+  position: relative;
+}
+
+/* 単語カードの綴じ穴とリング */
+.panel::before {
+  background: var(--kinari);
+  border-radius: 50%;
+  box-shadow: inset 0 1px 2px rgba(70, 53, 42, 0.3);
+  content: "";
+  height: 12px;
+  left: 28px;
+  position: absolute;
+  top: 10px;
+  width: 12px;
+}
+
+.panel::after {
+  border: 3px solid var(--ring-metal);
+  border-radius: 50%;
+  content: "";
+  height: 27px;
+  left: 24px;
+  position: absolute;
+  top: -13px;
+  transform: rotate(16deg);
+  width: 20px;
 }
 
 .panel-head {
@@ -98,54 +187,80 @@ h2 {
   margin-bottom: 14px;
 }
 
+h2 {
+  font-family: "Zen Maru Gothic", sans-serif;
+  font-size: 1.12rem;
+  font-weight: 700;
+}
+
 .panel-head p {
-  color: #61706d;
-  font-size: 0.92rem;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
   margin-top: 4px;
 }
 
+/* ---- 入力 ---- */
+
 .toggle {
   align-items: center;
-  background: #f4f6f3;
-  border: 1px solid #d7ded8;
+  background: var(--kinari);
+  border: 1.5px solid var(--line);
   border-radius: 999px;
   cursor: pointer;
   display: inline-flex;
   flex: 0 0 auto;
+  font-size: 0.88rem;
+  font-weight: 500;
   gap: 8px;
-  min-height: 36px;
-  padding: 7px 12px;
+  min-height: 38px;
+  padding: 7px 14px;
 }
 
 .toggle:has(input:disabled) {
-  color: #687773;
+  color: var(--ink-soft);
   cursor: not-allowed;
-  opacity: 0.72;
+  opacity: 0.7;
 }
 
 .toggle input {
-  accent-color: #1d6b5c;
+  accent-color: var(--mikan);
+  height: 16px;
+  width: 16px;
 }
 
 .source-textarea {
-  border: 1px solid #ccd6d0;
-  border-radius: 8px;
-  color: #1c2422;
-  min-height: 520px;
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  color: var(--ink);
+  min-height: 240px;
   outline: none;
   padding: 14px;
   resize: vertical;
   width: 100%;
 }
 
-.source-textarea:focus {
-  border-color: #247966;
-  box-shadow: 0 0 0 3px rgba(36, 121, 102, 0.14);
+@media (min-width: 901px) {
+  .source-textarea {
+    min-height: 440px;
+  }
 }
+
+.source-textarea::placeholder {
+  color: #b7a891;
+}
+
+.source-textarea:focus-visible {
+  border-color: var(--mikan);
+  box-shadow: 0 0 0 4px rgba(236, 123, 46, 0.18);
+}
+
+/* ---- ボタン ---- */
 
 .actions,
 .output-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 14px;
 }
@@ -153,42 +268,74 @@ h2 {
 button,
 .secondary-link {
   align-items: center;
-  border-radius: 8px;
+  border-radius: 999px;
   cursor: pointer;
   display: inline-flex;
+  font-family: "Zen Maru Gothic", sans-serif;
   font-weight: 700;
   gap: 8px;
   justify-content: center;
-  min-height: 42px;
-  padding: 9px 14px;
+  min-height: 46px;
+  padding: 10px 18px;
   text-decoration: none;
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
 .primary-button {
-  background: #1d6b5c;
-  border: 1px solid #1d6b5c;
-  color: #ffffff;
+  background: var(--mikan);
+  border: none;
+  box-shadow: 0 4px 0 var(--mikan-deep);
+  color: #fff;
+  flex: 1 1 auto;
+}
+
+@media (min-width: 901px) {
+  .primary-button {
+    flex: 0 1 auto;
+    min-width: 220px;
+  }
+}
+
+.primary-button:not(:disabled):hover {
+  background: #f18a42;
+}
+
+.primary-button:not(:disabled):active {
+  box-shadow: 0 1px 0 var(--mikan-deep);
+  transform: translateY(3px);
 }
 
 .secondary-button,
 .secondary-link,
 .icon-button {
-  background: #ffffff;
-  border: 1px solid #cbd6d0;
-  color: #1d302d;
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  box-shadow: 0 3px 0 var(--line);
+  color: var(--ink);
+}
+
+.secondary-button:not(:disabled):active,
+.secondary-link:active,
+.icon-button:not(:disabled):active {
+  box-shadow: 0 1px 0 var(--line);
+  transform: translateY(2px);
 }
 
 .icon-button {
   aspect-ratio: 1;
+  flex: 0 0 auto;
   padding: 0;
-  width: 42px;
+  width: 46px;
 }
 
-button:disabled,
-.secondary-link.disabled {
+button:disabled {
   cursor: not-allowed;
-  opacity: 0.48;
-  pointer-events: none;
+  opacity: 0.45;
+}
+
+:focus-visible {
+  outline: 3px solid rgba(236, 123, 46, 0.55);
+  outline-offset: 2px;
 }
 
 .spin {
@@ -201,88 +348,234 @@ button:disabled,
   }
 }
 
+/* ---- 通知 ---- */
+
 .error-box,
 .warning-box {
-  border-radius: 8px;
+  border-radius: 12px;
+  font-size: 0.92rem;
   margin-top: 12px;
-  padding: 10px 12px;
+  padding: 11px 14px;
 }
 
 .error-box {
-  background: #fff0ed;
-  color: #8a281b;
+  background: #fce4da;
+  border: 1.5px solid #f0c2af;
+  color: #99381a;
 }
 
 .warning-box {
-  background: #fff8e7;
-  color: #684d10;
+  background: #fff3d6;
+  border: 1.5px solid #eeddb0;
+  color: #7a5a17;
 }
 
-.link-meta {
-  background: #f5f7f4;
-  border-radius: 8px;
-  color: #475753;
-  display: flex;
-  flex-wrap: wrap;
-  font-size: 0.9rem;
-  gap: 10px;
-  justify-content: space-between;
-  margin-top: 12px;
-  padding: 10px 12px;
+/* ---- 変換結果 ---- */
+
+.result-area {
+  animation: rise 360ms ease-out;
 }
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.result-summary {
+  align-items: center;
+  background: #f1f6ec;
+  border: 1.5px solid #d9e5cf;
+  border-radius: 14px;
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.result-check {
+  color: var(--matcha);
+  flex: 0 0 auto;
+}
+
+.result-count {
+  font-family: "Zen Maru Gothic", sans-serif;
+  font-weight: 700;
+}
+
+.result-count strong {
+  color: var(--mikan-deep);
+  font-size: 1.7rem;
+  font-weight: 900;
+  margin-right: 2px;
+}
+
+.result-deck {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+/* ---- QRコード ---- */
 
 .qr-box {
   align-items: center;
-  background: #ffffff;
-  border: 1px solid #d7ded8;
-  border-radius: 8px;
+  background: var(--kinari);
+  border: 1.5px dashed var(--ring-metal);
+  border-radius: 16px;
   display: flex;
+  flex-direction: column;
   gap: 16px;
-  margin-top: 12px;
-  padding: 14px;
+  margin-top: 14px;
+  padding: 18px;
+  text-align: center;
+}
+
+@media (min-width: 561px) {
+  .qr-box {
+    flex-direction: row;
+    text-align: left;
+  }
+}
+
+.qr-code {
+  background: #fff;
+  border-radius: 12px;
+  flex: 0 0 auto;
+  line-height: 0;
+  padding: 10px;
 }
 
 .qr-help {
+  align-items: center;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+}
+
+@media (min-width: 561px) {
+  .qr-help {
+    align-items: flex-start;
+  }
 }
 
 .qr-help p {
-  color: #475753;
+  color: var(--ink-soft);
   font-size: 0.9rem;
 }
 
+.qr-title {
+  align-items: center;
+  color: var(--ink) !important;
+  display: flex;
+  font-family: "Zen Maru Gothic", sans-serif;
+  font-size: 0.98rem !important;
+  font-weight: 700;
+  gap: 6px;
+}
+
+.link-meta {
+  font-size: 0.82rem !important;
+  word-break: break-all;
+}
+
+/* ---- プレビュー・空状態 ---- */
+
 .preview {
-  background: #18201f;
-  border-radius: 8px;
-  color: #eef8f5;
-  min-height: 458px;
+  background: var(--preview-bg);
+  border-radius: 14px;
+  color: #f4e8d5;
+  font-size: 0.85rem;
   margin: 14px 0 0;
+  max-height: 320px;
   overflow: auto;
   padding: 14px;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
+.empty-state {
+  align-items: center;
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 44px 16px;
+  text-align: center;
+}
+
+.empty-cards {
+  height: 66px;
+  margin-bottom: 18px;
+  position: relative;
+  width: 104px;
+}
+
+.empty-cards span {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(70, 53, 42, 0.1);
+  inset: 0;
+  position: absolute;
+}
+
+.empty-cards span:nth-child(1) {
+  transform: rotate(-9deg) translateX(-10px);
+}
+
+.empty-cards span:nth-child(2) {
+  background: var(--honey);
+  transform: rotate(2deg);
+}
+
+.empty-cards span:nth-child(3) {
+  transform: rotate(10deg) translateX(10px);
+}
+
+.empty-title {
+  font-family: "Zen Maru Gothic", sans-serif;
+  font-weight: 700;
+}
+
+.empty-sub {
+  font-size: 0.88rem;
+}
+
+/* ---- フッター ---- */
+
+.privacy {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  margin: 26px auto 0;
+  max-width: 46em;
+  text-align: center;
+}
+
+/* ---- モバイル調整 ---- */
+
 @media (max-width: 900px) {
-  .app-shell {
-    padding: 18px;
-  }
-
-  .grid,
-  .topbar {
-    grid-template-columns: 1fr;
-  }
-
-  .topbar,
   .panel-head {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .source-textarea,
-  .preview {
-    min-height: 360px;
+  .toggle {
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
