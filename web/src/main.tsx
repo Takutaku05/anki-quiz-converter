@@ -1,6 +1,17 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CheckCircle2, Copy, Download, ExternalLink, Link2, Loader2, RotateCcw } from "lucide-react";
+import {
+  CheckCircle2,
+  Copy,
+  Download,
+  ExternalLink,
+  Layers,
+  Link2,
+  Loader2,
+  RotateCcw,
+  Smartphone,
+  Sparkles,
+} from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import "./styles.css";
 
@@ -39,6 +50,8 @@ function App() {
   const [createDownloadLink, setCreateDownloadLink] = useState(true);
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse | null>(null);
   const [apkgUrlCopied, setApkgUrlCopied] = useState(false);
+  const [tsvCopied, setTsvCopied] = useState(false);
+  const outputRef = useRef<HTMLElement>(null);
 
   const canConvert = source.trim().length > 0 && !isConverting;
   const canCreateApkgLink = capabilities?.apkg_download_links_enabled === true;
@@ -71,6 +84,13 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!result || !outputRef.current) return;
+    if (!window.matchMedia("(max-width: 900px)").matches) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    outputRef.current.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+  }, [result]);
 
   async function convert() {
     if (!canConvert) return;
@@ -115,6 +135,8 @@ function App() {
   async function copyTsv() {
     if (!result) return;
     await navigator.clipboard.writeText(result.tsv);
+    setTsvCopied(true);
+    window.setTimeout(() => setTsvCopied(false), 2000);
   }
 
   async function copyApkgUrl() {
@@ -133,24 +155,40 @@ function App() {
 
   return (
     <main className="app-shell">
-      <section className="workspace">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Anki Quiz Converter</p>
-            <h1>演習問題解答をAnki用ファイルへ変換</h1>
-          </div>
+      <div className="workspace">
+        <header className="hero">
+          <p className="brand">
+            <span className="brand-badge" aria-hidden="true">
+              <Layers size={18} />
+            </span>
+            Anki Quiz Converter
+          </p>
+          <h1>
+            演習問題を、<mark>Ankiのカード</mark>に。
+          </h1>
+          <p className="lead">薬理学の演習問題解答を貼り付けるだけで、Ankiにインポートできるデッキを作ります。</p>
+          <ol className="steps">
+            <li>
+              <span className="step-num" aria-hidden="true">1</span>
+              解答テキストを貼り付ける
+            </li>
+            <li>
+              <span className="step-num" aria-hidden="true">2</span>
+              変換ボタンを押す
+            </li>
+            <li>
+              <span className="step-num" aria-hidden="true">3</span>
+              QRコードでスマホのAnkiへ
+            </li>
+          </ol>
         </header>
-
-        <div className="notice" role="note">
-          入力された問題文は変換処理のためサーバーに送信されます。リンク作成をONにすると、.apkgファイルがサーバーに一時保存され、期限付きダウンロードURLが発行されます。URLをAnkiアプリの「共有デッキのダウンロード」に貼るか、スマホでQRコードを読み取ってインポートできます。
-        </div>
 
         <div className="grid">
           <section className="panel input-panel" aria-labelledby="input-title">
             <div className="panel-head">
               <div>
-                <h2 id="input-title">入力</h2>
-                <p>NotebookLMなどからコピーした演習問題解答を貼り付けます。</p>
+                <h2 id="input-title">問題テキスト</h2>
+                <p>NotebookLMなどからコピーした演習問題解答をそのまま貼り付けます。</p>
               </div>
               <label className="toggle">
                 <input
@@ -167,82 +205,132 @@ function App() {
               aria-label="変換元テキスト"
               className="source-textarea"
               onChange={(event) => setSource(event.target.value)}
-              placeholder="薬理学Ⅲ（アレルギー疾患治療薬）演習問題解答..."
+              placeholder="薬理学Ⅲ(アレルギー疾患治療薬)演習問題解答..."
               value={source}
             />
 
-            {error ? <div className="error-box" role="alert">{error}</div> : null}
+            {error ? (
+              <div className="error-box" role="alert">
+                {error}
+              </div>
+            ) : null}
 
             <div className="actions">
               <button className="primary-button" disabled={!canConvert} onClick={convert} type="button">
-                {isConverting ? <Loader2 className="spin" size={18} aria-hidden="true" /> : <CheckCircle2 size={18} aria-hidden="true" />}
-                <span>{isConverting ? "変換中" : "変換"}</span>
+                {isConverting ? (
+                  <Loader2 className="spin" size={18} aria-hidden="true" />
+                ) : (
+                  <Sparkles size={18} aria-hidden="true" />
+                )}
+                <span>{isConverting ? "変換中…" : "Ankiカードに変換"}</span>
               </button>
-              <button className="icon-button" disabled={!source && !result} onClick={reset} title="リセット" type="button">
+              <button
+                className="icon-button"
+                disabled={!source && !result}
+                onClick={reset}
+                title="最初からやり直す"
+                type="button"
+              >
                 <RotateCcw size={18} aria-hidden="true" />
               </button>
             </div>
           </section>
 
-          <section className="panel output-panel" aria-labelledby="output-title">
+          <section className="panel output-panel" aria-labelledby="output-title" ref={outputRef}>
             <div className="panel-head">
               <div>
-                <h2 id="output-title">出力</h2>
-                <p>{result ? result.deck : "TSVは即時ダウンロード、APKGはリンク作成ONで発行されます。"}</p>
+                <h2 id="output-title">できあがったデッキ</h2>
+                <p>TSVは即時ダウンロード、APKGはリンク作成ONで発行されます。</p>
               </div>
             </div>
 
-            <div className="output-actions">
-              <button className="secondary-button" disabled={!result} onClick={downloadLocal} type="button">
-                <Download size={18} aria-hidden="true" />
-                <span>TSVダウンロード</span>
-              </button>
-              <button className="secondary-button" disabled={!result} onClick={copyTsv} type="button">
-                <Copy size={18} aria-hidden="true" />
-                <span>コピー</span>
-              </button>
-              <a
-                aria-disabled={!result?.downloads.apkg}
-                className={`secondary-link ${result?.downloads.apkg ? "" : "disabled"}`}
-                href={result?.downloads.apkg?.url ?? "#"}
-                rel="noreferrer"
-                target="_blank"
-                title={result?.downloads.apkg ? "APKGの期限付きリンクを開く" : "APKGリンク作成がOFFです"}
-              >
-                <ExternalLink size={18} aria-hidden="true" />
-                <span>{result?.downloads.apkg ? "APKGリンクを開く" : "APKGリンク未作成"}</span>
-              </a>
-            </div>
-
-            {result?.warnings.map((warning) => (
-              <div className="warning-box" key={warning}>{warning}</div>
-            ))}
-
-            {result?.downloads.apkg ? (
-              <>
-                <div className="link-meta">
-                  <span>{result.downloads.apkg.filename}</span>
-                  <span>有効期限: {new Date(result.downloads.apkg.expires_at).toLocaleString("ja-JP")}</span>
-                </div>
-                <div className="qr-box">
-                  <QRCodeSVG size={148} value={result.downloads.apkg.url} />
-                  <div className="qr-help">
-                    <p>スマホでQRコードを読み取るか、URLをコピーしてAnkiアプリに貼り付けてください。</p>
-                    <button className="secondary-button" onClick={copyApkgUrl} type="button">
-                      <Link2 size={18} aria-hidden="true" />
-                      <span>{apkgUrlCopied ? "コピーしました" : "URLをコピー"}</span>
-                    </button>
+            {result ? (
+              <div className="result-area">
+                <div className="result-summary">
+                  <CheckCircle2 className="result-check" size={22} aria-hidden="true" />
+                  <div>
+                    <p className="result-count">
+                      <strong>{result.card_count}</strong>枚のカードができました
+                    </p>
+                    <p className="result-deck">{result.deck}</p>
                   </div>
                 </div>
-              </>
-            ) : null}
 
-            <pre className="preview" aria-label="TSVプレビュー">
-              {previewLines || "ここにTSVプレビューが表示されます。"}
-            </pre>
+                <div className="output-actions">
+                  <button className="secondary-button" onClick={downloadLocal} type="button">
+                    <Download size={18} aria-hidden="true" />
+                    <span>TSVダウンロード</span>
+                  </button>
+                  <button className="secondary-button" onClick={copyTsv} type="button">
+                    <Copy size={18} aria-hidden="true" />
+                    <span>{tsvCopied ? "コピーしました" : "TSVをコピー"}</span>
+                  </button>
+                  {result.downloads.apkg ? (
+                    <a
+                      className="secondary-link"
+                      href={result.downloads.apkg.url}
+                      rel="noreferrer"
+                      target="_blank"
+                      title="APKGの期限付きリンクを開く"
+                    >
+                      <ExternalLink size={18} aria-hidden="true" />
+                      <span>APKGリンクを開く</span>
+                    </a>
+                  ) : null}
+                </div>
+
+                {result.warnings.map((warning) => (
+                  <div className="warning-box" key={warning}>
+                    {warning}
+                  </div>
+                ))}
+
+                {result.downloads.apkg ? (
+                  <div className="qr-box">
+                    <div className="qr-code">
+                      <QRCodeSVG size={148} value={result.downloads.apkg.url} />
+                    </div>
+                    <div className="qr-help">
+                      <p className="qr-title">
+                        <Smartphone size={16} aria-hidden="true" />
+                        スマホのAnkiに入れる
+                      </p>
+                      <p>QRコードを読み取るか、URLをコピーしてAnkiアプリに貼り付けてください。</p>
+                      <p className="link-meta">
+                        {result.downloads.apkg.filename}
+                        <br />
+                        有効期限: {new Date(result.downloads.apkg.expires_at).toLocaleString("ja-JP")}
+                      </p>
+                      <button className="secondary-button" onClick={copyApkgUrl} type="button">
+                        <Link2 size={18} aria-hidden="true" />
+                        <span>{apkgUrlCopied ? "コピーしました" : "URLをコピー"}</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <pre className="preview" aria-label="TSVプレビュー">
+                  {previewLines}
+                </pre>
+              </div>
+            ) : (
+              <div className="empty-state">
+                <div className="empty-cards" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <p className="empty-title">まだカードはありません</p>
+                <p className="empty-sub">問題テキストを変換すると、ここにデッキが表示されます。</p>
+              </div>
+            )}
           </section>
         </div>
-      </section>
+
+        <footer className="privacy">
+          入力したテキストは変換処理のためサーバーに送信されます。ダウンロードリンクは有効期限付きです。期限が切れたら、もう一度変換してください。
+        </footer>
+      </div>
     </main>
   );
 }
