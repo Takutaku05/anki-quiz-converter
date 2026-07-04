@@ -67,14 +67,20 @@ p {
 
 .brand-badge {
   align-items: center;
-  background: var(--mikan);
-  border-radius: 12px;
-  box-shadow: 0 2px 0 var(--mikan-deep);
+  background: linear-gradient(150deg, #f6994b 0%, var(--mikan) 55%, var(--mikan-deep) 100%);
+  border-radius: 11px;
+  box-shadow:
+    0 2px 0 var(--mikan-deep),
+    0 5px 12px rgba(194, 94, 23, 0.28);
   color: #fff;
   display: inline-flex;
-  height: 32px;
+  height: 36px;
   justify-content: center;
-  width: 32px;
+  width: 36px;
+}
+
+.brand-badge svg {
+  filter: drop-shadow(0 1px 1px rgba(122, 55, 12, 0.3));
 }
 
 h1 {
