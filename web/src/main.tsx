@@ -51,6 +51,7 @@ function App() {
   const [apkgUrlCopied, setApkgUrlCopied] = useState(false);
   const [tsvCopied, setTsvCopied] = useState(false);
   const outputRef = useRef<HTMLElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const canConvert = source.trim().length > 0 && !isConverting;
   const canCreateApkgLink = capabilities?.apkg_download_links_enabled === true;
@@ -93,9 +94,13 @@ function App() {
 
   async function convert() {
     if (!canConvert) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
     setIsConverting(true);
     setError("");
     setResult(null);
+    setTsvCopied(false);
+    setApkgUrlCopied(false);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/convert`, {
@@ -107,6 +112,7 @@ function App() {
           source,
           create_download_link: createDownloadLink,
         }),
+        signal: controller.signal,
       });
       const data = await response.json();
       if (!response.ok) {
@@ -114,8 +120,14 @@ function App() {
       }
       setResult(data);
     } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") {
+        return;
+      }
       setError(caught instanceof Error ? caught.message : "変換に失敗しました。");
     } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
       setIsConverting(false);
     }
   }
@@ -147,9 +159,12 @@ function App() {
   }
 
   function reset() {
+    abortRef.current?.abort();
     setSource("");
     setResult(null);
     setError("");
+    setTsvCopied(false);
+    setApkgUrlCopied(false);
   }
 
   return (
