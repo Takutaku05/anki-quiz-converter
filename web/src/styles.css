@@ -256,6 +256,24 @@ h2 {
   color: #b7a891;
 }
 
+.input-panel.dragging {
+  border-color: var(--mikan);
+  box-shadow: 0 0 0 4px rgba(236, 123, 46, 0.18);
+}
+
+.source-tools {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.source-tools-hint {
+  color: #8f8069;
+  font-size: 0.82rem;
+}
+
 .source-textarea:focus-visible {
   border-color: var(--mikan);
   box-shadow: 0 0 0 4px rgba(236, 123, 46, 0.18);

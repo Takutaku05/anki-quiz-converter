@@ -5,7 +5,7 @@ import os
 import sys
 from urllib.parse import quote
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -15,13 +15,17 @@ from .api_helpers import (
     build_wordholic_filename,
     count_tsv_cards,
     japanese_error_message,
+    pdf_error_message,
 )
 from .download_store import DownloadLink, InMemoryDownloadStore
+from .pdf_extractor import PdfExtractionError, extract_pdf_text
 from .quiz_converter import convert_text, extract_deck, remove_ignored_urls
 from .wordholic_builder import WORDHOLIC_HEADER, build_wordholic_csv
 
 
 LOGGER = logging.getLogger("anki_quiz_converter.api")
+
+MAX_PDF_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
 class ConvertRequest(BaseModel):
@@ -49,6 +53,12 @@ class ConvertResponse(BaseModel):
 class CapabilitiesResponse(BaseModel):
     apkg_download_links_enabled: bool
     link_ttl_seconds: int | None
+
+
+class ExtractPdfResponse(BaseModel):
+    text: str
+    page_count: int
+    char_count: int
 
 
 def _empty_wordholic_csv() -> str:
@@ -141,6 +151,30 @@ def create_app(store: InMemoryDownloadStore | None = None) -> FastAPI:
             apkg_filename=apkg_filename,
             downloads=Downloads(apkg=apkg_link),
             warnings=warnings,
+        )
+
+    @app.post("/api/extract-pdf", response_model=ExtractPdfResponse)
+    async def extract_pdf(file: UploadFile = File(...)) -> ExtractPdfResponse:
+        # Content-Lengthは信用せず、読み込んだ実サイズで検証する。
+        data = await file.read()
+        if len(data) > MAX_PDF_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail="ファイルサイズが大きすぎます。10MB以下のPDFをアップロードしてください。",
+            )
+        if not data.startswith(b"%PDF-"):
+            raise HTTPException(
+                status_code=400,
+                detail="PDFファイルを選択してください。",
+            )
+        try:
+            extracted = extract_pdf_text(data)
+        except PdfExtractionError as exc:
+            raise HTTPException(status_code=422, detail=pdf_error_message(exc)) from exc
+        return ExtractPdfResponse(
+            text=extracted.text,
+            page_count=extracted.page_count,
+            char_count=len(extracted.text),
         )
 
     @app.get("/api/download/{token}")
