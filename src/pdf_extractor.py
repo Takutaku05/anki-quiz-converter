@@ -23,7 +23,11 @@ class EncryptedPdfError(PdfExtractionError):
 
 
 class CorruptPdfError(PdfExtractionError):
-    """壊れているか読み取れないPDF。ページ数超過も含む。"""
+    """壊れているか読み取れないPDF。"""
+
+
+class TooManyPagesError(PdfExtractionError):
+    """ページ数が上限を超えているPDF。"""
 
 
 class NoTextLayerError(PdfExtractionError):
@@ -56,14 +60,12 @@ def extract_pdf_text(data: bytes, *, max_pages: int = MAX_PAGES) -> PdfExtractio
     except PdfReadError as exc:
         raise CorruptPdfError(str(exc)) from exc
     if page_count > max_pages:
-        raise CorruptPdfError(f"too many pages: {page_count} > {max_pages}")
+        raise TooManyPagesError(f"too many pages: {page_count} > {max_pages}")
 
     parts: list[str] = []
     for page in reader.pages:
         try:
             parts.append(page.extract_text() or "")
-        except PdfExtractionError:
-            raise
         except Exception as exc:  # pypdfは特殊なフォントで多様な例外を投げうる
             raise CorruptPdfError(str(exc)) from exc
 
