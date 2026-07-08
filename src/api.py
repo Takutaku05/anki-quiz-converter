@@ -108,8 +108,8 @@ def create_app(store: InMemoryDownloadStore | None = None) -> FastAPI:
         warnings: list[str] = []
         try:
             wordholic_csv = build_wordholic_csv(tsv)
-        except ValueError:
-            LOGGER.warning("WordHolic CSV generation failed for deck %r", deck)
+        except Exception:
+            LOGGER.warning("WordHolic CSV generation failed for deck %r", deck, exc_info=True)
             wordholic_csv = _empty_wordholic_csv()
             warnings.append("WordHolic用CSVの生成に失敗しました。TSVをご利用ください。")
 
