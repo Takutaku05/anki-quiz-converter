@@ -16,6 +16,22 @@ class QuizConverterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no question blocks were found"):
             convert_text("薬理学Ⅲ（アレルギー疾患治療薬）演習問題解答\n1. テスト文（○）")
 
+    def test_convert_text_normalizes_spaced_round_digits_from_pdf(self):
+        source = """薬理学Ⅲ（抗炎症薬）演習問題解答
+問1 正しいものに○ 誤っているものに×を記せ。第1 0 5回
+1. ガストリン受容体の刺激（×）
+問2 正しいものに○ 誤っているものに×を記せ。第 103 回
+1. ロキソプロフェンは、プロドラッグである。（○）
+問3 正しいものに○ 誤っているものに×を記せ。第9 9回
+1. セレコキシブは、COX-2を選択的に阻害する。（×）
+"""
+
+        tsv = convert_text(source)
+
+        self.assertIn("ガストリン受容体の刺激\t×\t第105回 問1", tsv)
+        self.assertIn("ロキソプロフェンは、プロドラッグである。\t○\t第103回 問2", tsv)
+        self.assertIn("セレコキシブは、COX-2を選択的に阻害する。\t×\t第99回 問3", tsv)
+
 
 if __name__ == "__main__":
     unittest.main()

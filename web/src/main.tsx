@@ -6,6 +6,7 @@ import {
   Download,
   ExternalLink,
   FileSpreadsheet,
+  FileUp,
   Link2,
   Loader2,
   RotateCcw,
@@ -49,6 +50,9 @@ function App() {
   const [result, setResult] = useState<ConvertResponse | null>(null);
   const [error, setError] = useState("");
   const [isConverting, setIsConverting] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [pdfNote, setPdfNote] = useState("");
   const [createDownloadLink, setCreateDownloadLink] = useState(true);
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse | null>(null);
   const [apkgUrlCopied, setApkgUrlCopied] = useState(false);
@@ -56,6 +60,7 @@ function App() {
   const [wordholicCopied, setWordholicCopied] = useState(false);
   const outputRef = useRef<HTMLElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const canConvert = source.trim().length > 0 && !isConverting;
   const canCreateApkgLink = capabilities?.apkg_download_links_enabled === true;
@@ -137,6 +142,55 @@ function App() {
     }
   }
 
+  async function uploadPdf(fileObj: File) {
+    if (isExtracting) return;
+    if (!fileObj.name.toLowerCase().endsWith(".pdf")) {
+      setError("PDFファイルを選択してください。");
+      return;
+    }
+    if (fileObj.size > 10 * 1024 * 1024) {
+      setError("ファイルサイズが大きすぎます。10MB以下のPDFをアップロードしてください。");
+      return;
+    }
+    setIsExtracting(true);
+    setError("");
+    setPdfNote("");
+    try {
+      const form = new FormData();
+      form.append("file", fileObj);
+      // Content-Typeは指定しない（ブラウザがmultipartの境界を付与する）。
+      const response = await fetch(`${API_BASE_URL}/api/extract-pdf`, {
+        method: "POST",
+        body: form,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail ?? "PDFを読み取れませんでした。");
+      }
+      setSource(data.text);
+      setResult(null);
+      setPdfNote("PDFを読み込みました。内容を確認・修正してから変換してください。");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "PDFを読み取れませんでした。");
+    } finally {
+      setIsExtracting(false);
+    }
+  }
+
+  function onPickPdf(event: React.ChangeEvent<HTMLInputElement>) {
+    const fileObj = event.target.files?.[0];
+    if (fileObj) uploadPdf(fileObj);
+    // 同じファイルを続けて選び直せるよう入力をリセットする。
+    event.target.value = "";
+  }
+
+  function onDropPdf(event: React.DragEvent<HTMLElement>) {
+    event.preventDefault();
+    setIsDragging(false);
+    const fileObj = event.dataTransfer.files?.[0];
+    if (fileObj) uploadPdf(fileObj);
+  }
+
   function downloadText(content: string, filename: string, type: string) {
     const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
@@ -188,6 +242,7 @@ function App() {
     setSource("");
     setResult(null);
     setError("");
+    setPdfNote("");
     setTsvCopied(false);
     setWordholicCopied(false);
     setApkgUrlCopied(false);
@@ -254,11 +309,21 @@ function App() {
         </header>
 
         <div className="grid">
-          <section className="panel input-panel" aria-labelledby="input-title">
+          <section
+            className={`panel input-panel${isDragging ? " dragging" : ""}`}
+            aria-labelledby="input-title"
+            onDragOver={(event) => {
+              if (!event.dataTransfer.types.includes("Files")) return;
+              event.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={onDropPdf}
+          >
             <div className="panel-head">
               <div>
                 <h2 id="input-title">問題テキスト</h2>
-                <p>コピーした演習問題解答をそのまま貼り付けます。</p>
+                <p>テキストを貼り付けるか、PDFを読み込みます。</p>
               </div>
               <label className="toggle">
                 <input
@@ -271,6 +336,30 @@ function App() {
               </label>
             </div>
 
+            <div className="source-tools">
+              <input
+                ref={fileInputRef}
+                accept="application/pdf,.pdf"
+                onChange={onPickPdf}
+                style={{ display: "none" }}
+                type="file"
+              />
+              <button
+                className="secondary-button"
+                disabled={isExtracting}
+                onClick={() => fileInputRef.current?.click()}
+                type="button"
+              >
+                {isExtracting ? (
+                  <Loader2 className="spin" size={18} aria-hidden="true" />
+                ) : (
+                  <FileUp size={18} aria-hidden="true" />
+                )}
+                <span>{isExtracting ? "読み込み中…" : "PDFから読み込む"}</span>
+              </button>
+              <span className="source-tools-hint">文字が埋め込まれたPDFに対応（ドラッグ＆ドロップ可）</span>
+            </div>
+
             <textarea
               aria-label="変換元テキスト"
               className="source-textarea"
@@ -278,6 +367,8 @@ function App() {
               placeholder="薬理学Ⅲ(アレルギー疾患治療薬)演習問題解答..."
               value={source}
             />
+
+            {pdfNote ? <div className="warning-box">{pdfNote}</div> : null}
 
             {error ? (
               <div className="error-box" role="alert">
