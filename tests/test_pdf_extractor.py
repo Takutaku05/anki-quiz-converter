@@ -8,6 +8,7 @@ from src.pdf_extractor import (
     CorruptPdfError,
     EncryptedPdfError,
     NoTextLayerError,
+    TooManyPagesError,
     collapse_cjk_spaces,
     extract_pdf_text,
 )
@@ -64,7 +65,7 @@ class ExtractPdfTextTests(unittest.TestCase):
             extract_pdf_text(b"%PDF-1.4 not really a pdf")
 
     def test_too_many_pages_raises(self):
-        with self.assertRaises(CorruptPdfError):
+        with self.assertRaises(TooManyPagesError):
             extract_pdf_text(_blank_pdf_bytes(), max_pages=0)
 
 

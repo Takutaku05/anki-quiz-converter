@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from .pdf_extractor import EncryptedPdfError, NoTextLayerError
+from .pdf_extractor import EncryptedPdfError, NoTextLayerError, TooManyPagesError
 
 
 def japanese_error_message(error: Exception) -> str:
@@ -30,6 +30,8 @@ def pdf_error_message(error: Exception) -> str:
             "画像として保存されたPDF（スキャンや写真）には対応していません。"
             "文字が埋め込まれたPDFをご利用ください。"
         )
+    if isinstance(error, TooManyPagesError):
+        return "ページ数が多すぎます。50ページ以下のPDFをアップロードしてください。"
     return "PDFを読み取れませんでした。ファイルが壊れていないか確認してください。"
 
 

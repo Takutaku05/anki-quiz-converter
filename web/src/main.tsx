@@ -313,6 +313,7 @@ function App() {
             className={`panel input-panel${isDragging ? " dragging" : ""}`}
             aria-labelledby="input-title"
             onDragOver={(event) => {
+              if (!event.dataTransfer.types.includes("Files")) return;
               event.preventDefault();
               setIsDragging(true);
             }}
