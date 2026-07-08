@@ -5,6 +5,7 @@ import {
   Copy,
   Download,
   ExternalLink,
+  FileSpreadsheet,
   Link2,
   Loader2,
   RotateCcw,
@@ -26,6 +27,8 @@ type ConvertResponse = {
   card_count: number;
   tsv: string;
   tsv_filename: string;
+  wordholic_csv: string;
+  wordholic_filename: string;
   apkg_filename: string;
   downloads: {
     tsv: DownloadLink | null;
@@ -50,6 +53,7 @@ function App() {
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse | null>(null);
   const [apkgUrlCopied, setApkgUrlCopied] = useState(false);
   const [tsvCopied, setTsvCopied] = useState(false);
+  const [wordholicCopied, setWordholicCopied] = useState(false);
   const outputRef = useRef<HTMLElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -100,6 +104,7 @@ function App() {
     setError("");
     setResult(null);
     setTsvCopied(false);
+    setWordholicCopied(false);
     setApkgUrlCopied(false);
 
     try {
@@ -132,15 +137,28 @@ function App() {
     }
   }
 
-  function downloadLocal() {
-    if (!result) return;
-    const blob = new Blob([result.tsv], { type: "text/tab-separated-values;charset=utf-8" });
+  function downloadText(content: string, filename: string, type: string) {
+    const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = result.tsv_filename;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
     anchor.click();
-    URL.revokeObjectURL(url);
+    anchor.remove();
+    // モバイルSafariはダウンロード開始が非同期のため、即時revokeすると
+    // 空ファイルになることがある。少し遅延させてから解放する。
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function downloadTsv() {
+    if (!result) return;
+    downloadText(result.tsv, result.tsv_filename, "text/tab-separated-values;charset=utf-8");
+  }
+
+  function downloadWordHolicCsv() {
+    if (!result) return;
+    downloadText(result.wordholic_csv, result.wordholic_filename, "text/csv;charset=utf-8");
   }
 
   async function copyTsv() {
@@ -148,6 +166,13 @@ function App() {
     await navigator.clipboard.writeText(result.tsv);
     setTsvCopied(true);
     window.setTimeout(() => setTsvCopied(false), 2000);
+  }
+
+  async function copyWordHolicCsv() {
+    if (!result) return;
+    await navigator.clipboard.writeText(result.wordholic_csv);
+    setWordholicCopied(true);
+    window.setTimeout(() => setWordholicCopied(false), 2000);
   }
 
   async function copyApkgUrl() {
@@ -164,6 +189,7 @@ function App() {
     setResult(null);
     setError("");
     setTsvCopied(false);
+    setWordholicCopied(false);
     setApkgUrlCopied(false);
   }
 
@@ -208,9 +234,9 @@ function App() {
             Anki Quiz Converter
           </p>
           <h1>
-            演習問題を、<mark>Ankiのカード</mark>に。
+            演習問題を、<mark>Anki/WordHolicのカード</mark>に。
           </h1>
-          <p className="lead">薬理学の演習問題解答を貼り付けるだけで、Ankiにインポートできるデッキを作ります。</p>
+          <p className="lead">薬理学の演習問題解答を貼り付けるだけで、AnkiとWordHolicにインポートできるカードを作ります。</p>
           <ol className="steps">
             <li>
               <span className="step-num" aria-hidden="true">1</span>
@@ -222,7 +248,7 @@ function App() {
             </li>
             <li>
               <span className="step-num" aria-hidden="true">3</span>
-              QRコードでスマホのAnkiへ
+              TSV/CSVを保存して使う
             </li>
           </ol>
         </header>
@@ -266,7 +292,7 @@ function App() {
                 ) : (
                   <Sparkles size={18} aria-hidden="true" />
                 )}
-                <span>{isConverting ? "変換中…" : "Ankiカードに変換"}</span>
+                <span>{isConverting ? "変換中…" : "カードに変換"}</span>
               </button>
               <button
                 className="icon-button"
@@ -284,7 +310,7 @@ function App() {
             <div className="panel-head">
               <div>
                 <h2 id="output-title">できあがったデッキ</h2>
-                <p>TSVは即時ダウンロード、APKGはリンク作成ONで発行されます。</p>
+                <p>TSV/CSVは即時ダウンロード、APKGはリンク作成ONで発行されます。</p>
               </div>
             </div>
 
@@ -301,13 +327,21 @@ function App() {
                 </div>
 
                 <div className="output-actions">
-                  <button className="secondary-button" onClick={downloadLocal} type="button">
+                  <button className="secondary-button" onClick={downloadTsv} type="button">
                     <Download size={18} aria-hidden="true" />
                     <span>TSVダウンロード</span>
+                  </button>
+                  <button className="secondary-button" onClick={downloadWordHolicCsv} type="button">
+                    <FileSpreadsheet size={18} aria-hidden="true" />
+                    <span>WordHolic CSV</span>
                   </button>
                   <button className="secondary-button" onClick={copyTsv} type="button">
                     <Copy size={18} aria-hidden="true" />
                     <span>{tsvCopied ? "コピーしました" : "TSVをコピー"}</span>
+                  </button>
+                  <button className="secondary-button" onClick={copyWordHolicCsv} type="button">
+                    <Copy size={18} aria-hidden="true" />
+                    <span>{wordholicCopied ? "コピーしました" : "CSVをコピー"}</span>
                   </button>
                   {result.downloads.apkg ? (
                     <a
