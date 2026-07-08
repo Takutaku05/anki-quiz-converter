@@ -1,10 +1,11 @@
 # Anki Quiz Converter Web
 
-薬理学の演習問題解答テキストをAnkiインポート用TSVに変換するWebアプリです。
+薬理学の演習問題解答テキストをAnkiインポート用TSVとWordHolic用CSVに変換するWebアプリです。
 
 ## 構成
 
 - `src/quiz_converter.py`: 既存の変換ロジック
+- `src/wordholic_builder.py`: Anki TSVからWordHolic CSVを生成するロジック
 - `src/api.py`: FastAPI API
 - `src/download_store.py`: 変換した.apkgをサーバーメモリに一時保存し、トークン付きURLで配信
 - `web/`: Cloudflare Pages向けReact/Viteフロントエンド
@@ -32,11 +33,12 @@ npm run dev
 
 ## 期限付きダウンロードリンク
 
-`POST /api/convert` は、APKGをサーバーメモリに一時保存し、`GET /api/download/{token}` のURLを返します。外部ストレージ（R2など）は不要です。
+`POST /api/convert` はAnki TSVとWordHolic CSVを返します。APKGリンク作成が有効な場合は、APKGをサーバーメモリに一時保存し、`GET /api/download/{token}` のURLも返します。外部ストレージ（R2など）は不要です。
 
 - リンクの有効期限は `DOWNLOAD_LINK_TTL_SECONDS`（デフォルト30分）
 - サーバー再起動やスリープ（Render無料プラン）でリンクは無効になります。その場合は再変換してください
 - フロントエンドはURLのQRコードを表示するので、PCで変換してスマホのAnkiアプリでインポートできます
+- WordHolic CSVは `FrontText,BackText,Comment,FrontTextLanguage,BackTextLanguage` の5列で生成します
 
 必要な環境変数:
 
@@ -90,6 +92,8 @@ Content-Type: application/json
   "card_count": 50,
   "tsv": "#separator:Tab\n...",
   "tsv_filename": "薬理学Ⅲ_アレルギー疾患治療薬.tsv",
+  "wordholic_csv": "FrontText,BackText,Comment,FrontTextLanguage,BackTextLanguage\r\n...",
+  "wordholic_filename": "薬理学Ⅲ_アレルギー疾患治療薬_WordHolic.csv",
   "apkg_filename": "薬理学Ⅲ_アレルギー疾患治療薬.apkg",
   "downloads": {
     "tsv": null,

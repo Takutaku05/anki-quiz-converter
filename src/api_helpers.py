@@ -25,3 +25,7 @@ def build_download_filename(deck: str, extension: str) -> str:
     if not safe_name:
         safe_name = "anki_cards"
     return f"{safe_name}.{extension.lstrip('.')}"
+
+
+def build_wordholic_filename(deck: str) -> str:
+    return build_download_filename(f"{deck}_WordHolic", "csv")

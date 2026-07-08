@@ -10,9 +10,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .apkg_builder import build_apkg_bytes
-from .api_helpers import build_download_filename, count_tsv_cards, japanese_error_message
+from .api_helpers import (
+    build_download_filename,
+    build_wordholic_filename,
+    count_tsv_cards,
+    japanese_error_message,
+)
 from .download_store import DownloadLink, InMemoryDownloadStore
 from .quiz_converter import convert_text, extract_deck, remove_ignored_urls
+from .wordholic_builder import WORDHOLIC_HEADER, build_wordholic_csv
 
 
 LOGGER = logging.getLogger("anki_quiz_converter.api")
@@ -33,6 +39,8 @@ class ConvertResponse(BaseModel):
     card_count: int
     tsv: str
     tsv_filename: str
+    wordholic_csv: str
+    wordholic_filename: str
     apkg_filename: str
     downloads: Downloads
     warnings: list[str]
@@ -41,6 +49,11 @@ class ConvertResponse(BaseModel):
 class CapabilitiesResponse(BaseModel):
     apkg_download_links_enabled: bool
     link_ttl_seconds: int | None
+
+
+def _empty_wordholic_csv() -> str:
+    # ヘッダーのみのCSV（build_wordholic_csvと同じCRLF区切り）。
+    return ",".join(WORDHOLIC_HEADER) + "\r\n"
 
 
 def create_app(store: InMemoryDownloadStore | None = None) -> FastAPI:
@@ -91,7 +104,17 @@ def create_app(store: InMemoryDownloadStore | None = None) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=japanese_error_message(exc)) from exc
 
+        # WordHolic出力は付随機能なので、失敗してもTSV/APKGの変換結果は返す。
+        warnings: list[str] = []
+        try:
+            wordholic_csv = build_wordholic_csv(tsv)
+        except Exception:
+            LOGGER.warning("WordHolic CSV generation failed for deck %r", deck, exc_info=True)
+            wordholic_csv = _empty_wordholic_csv()
+            warnings.append("WordHolic用CSVの生成に失敗しました。TSVをご利用ください。")
+
         tsv_filename = build_download_filename(deck, "tsv")
+        wordholic_filename = build_wordholic_filename(deck)
         apkg_filename = build_download_filename(deck, "apkg")
         apkg_link: DownloadLink | None = None
 
@@ -113,9 +136,11 @@ def create_app(store: InMemoryDownloadStore | None = None) -> FastAPI:
             card_count=count_tsv_cards(tsv),
             tsv=tsv,
             tsv_filename=tsv_filename,
+            wordholic_csv=wordholic_csv,
+            wordholic_filename=wordholic_filename,
             apkg_filename=apkg_filename,
             downloads=Downloads(apkg=apkg_link),
-            warnings=[],
+            warnings=warnings,
         )
 
     @app.get("/api/download/{token}")
