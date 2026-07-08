@@ -29,7 +29,7 @@ ITEM_RE = re.compile(
     r"(?m)(?:(?<!\S)(?P<number_dot>[0-9０-９]{1,2})\s*[\.．]\s*"
     r"|(?:^|\n|(?<=回)|(?<=[)）]))[ \t　]*(?P<number_plain>[0-9０-９]{1,2})\s+)"
 )
-ROUND_RE = re.compile(r"第\s*(?P<round>[0-9０-９]+)\s*回?")
+ROUND_RE = re.compile(r"第\s*(?P<round>[0-9０-９](?:\s*[0-9０-９])*)\s*回?")
 ANSWER_RE = re.compile(r"[\(（]\s*(?P<answer>[○〇◯⚪×✕✖])\s*[\)）]")
 
 FULLWIDTH_DIGITS = str.maketrans("０１２３４５６７８９", "0123456789")
@@ -173,7 +173,7 @@ def normalize_answer(answer: str) -> str:
 
 
 def normalize_number(number: str) -> str:
-    return number.translate(FULLWIDTH_DIGITS)
+    return re.sub(r"\s+", "", number).translate(FULLWIDTH_DIGITS)
 
 
 def normalize_spaces(text: str) -> str:
