@@ -1,13 +1,35 @@
+import io
 import logging
 import os
 import unittest
 from unittest import mock
 
 from fastapi.testclient import TestClient
+from pypdf import PdfWriter
 
 from src.api import LOGGER, create_app
 from src.download_store import InMemoryDownloadStore
 from sample_data import SAMPLE_SOURCE
+
+FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+SAMPLE_PDF = os.path.join(FIXTURE_DIR, "sample_quiz_ja.pdf")
+
+
+def _blank_pdf_bytes() -> bytes:
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
+def _encrypted_pdf_bytes() -> bytes:
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.encrypt(user_password="secret", algorithm="RC4-128")
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
 
 
 class ApiTests(unittest.TestCase):
@@ -76,6 +98,56 @@ class ApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"], "タイトルからデッキ名を抽出できません。")
+
+    def test_extract_pdf_returns_text(self):
+        with open(SAMPLE_PDF, "rb") as handle:
+            response = self.client.post(
+                "/api/extract-pdf",
+                files={"file": ("quiz.pdf", handle.read(), "application/pdf")},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("レボセチリジン", data["text"])
+        self.assertGreaterEqual(data["page_count"], 1)
+        self.assertEqual(data["char_count"], len(data["text"]))
+
+    def test_extract_pdf_rejects_non_pdf(self):
+        response = self.client.post(
+            "/api/extract-pdf",
+            files={"file": ("notes.txt", b"hello world", "text/plain")},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "PDFファイルを選択してください。")
+
+    def test_extract_pdf_rejects_oversized_file(self):
+        payload = b"%PDF-" + b"0" * (10 * 1024 * 1024 + 1)
+        response = self.client.post(
+            "/api/extract-pdf",
+            files={"file": ("big.pdf", payload, "application/pdf")},
+        )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertIn("大きすぎます", response.json()["detail"])
+
+    def test_extract_pdf_rejects_encrypted(self):
+        response = self.client.post(
+            "/api/extract-pdf",
+            files={"file": ("locked.pdf", _encrypted_pdf_bytes(), "application/pdf")},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("暗号化", response.json()["detail"])
+
+    def test_extract_pdf_scanned_returns_error(self):
+        response = self.client.post(
+            "/api/extract-pdf",
+            files={"file": ("scan.pdf", _blank_pdf_bytes(), "application/pdf")},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("画像として保存されたPDF", response.json()["detail"])
 
     def test_unhandled_errors_are_logged(self):
         app = create_app(store=self.store)

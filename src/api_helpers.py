@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+from .pdf_extractor import EncryptedPdfError, NoTextLayerError, TooManyPagesError
+
 
 def japanese_error_message(error: Exception) -> str:
     message = str(error)
@@ -14,6 +16,23 @@ def japanese_error_message(error: Exception) -> str:
     if "unsupported answer marker" in message:
         return "対応していない解答記号が含まれています。"
     return "変換に失敗しました。入力内容を確認してください。"
+
+
+def pdf_error_message(error: Exception) -> str:
+    if isinstance(error, EncryptedPdfError):
+        return (
+            "パスワード付き（暗号化された）PDFには対応していません。"
+            "パスワードを解除してからアップロードしてください。"
+        )
+    if isinstance(error, NoTextLayerError):
+        return (
+            "PDFから文字を抽出できませんでした。"
+            "画像として保存されたPDF（スキャンや写真）には対応していません。"
+            "文字が埋め込まれたPDFをご利用ください。"
+        )
+    if isinstance(error, TooManyPagesError):
+        return "ページ数が多すぎます。50ページ以下のPDFをアップロードしてください。"
+    return "PDFを読み取れませんでした。ファイルが壊れていないか確認してください。"
 
 
 def count_tsv_cards(tsv: str) -> int:
