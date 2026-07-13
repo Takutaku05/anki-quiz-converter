@@ -179,13 +179,6 @@ def document_head(text: str) -> str:
     return "\n".join(normalized.split("\n")[:15])
 
 
-def first_meaningful_line(head: str) -> str:
-    """Pick the first line that looks like a document title, not an item."""
-
-    lines = meaningful_lines(head)
-    return lines[0] if lines else ""
-
-
 def meaningful_lines(head: str) -> list[str]:
     """Return plausible heading lines from a document head."""
 
@@ -295,38 +288,35 @@ def find_answer(text: str) -> re.Match[str] | None:
     return None
 
 
-def parse_items(section: str) -> list[ParsedItem]:
-    item_matches = list(ITEM_RE.finditer(section))
-    items: list[ParsedItem] = []
-
-    for index, item_match in enumerate(item_matches):
-        item_start = item_match.end()
-        item_end = item_matches[index + 1].start() if index + 1 < len(item_matches) else len(section)
-        item = build_item(section[item_start:item_end])
-        if item:
-            items.append(item)
-
-    return items
-
-
 def parse_items_flexible(section: str) -> tuple[list[ParsedItem], bool]:
-    """Parse numbered items and answer-bearing unnumbered lines in source order."""
+    """Parse numbered items and answer-bearing unnumbered lines in source order.
+
+    ``numbered_matches`` is sorted by position, so a single forward-moving index
+    is enough to find, for each line, whether a marker ends on it and which
+    marker precedes it.  This keeps the scan linear in the input size.
+    """
 
     numbered_matches = list(ITEM_RE.finditer(section))
     candidates: list[tuple[int, int, bool]] = [
         (match.start(), match.end(), False) for match in numbered_matches
     ]
 
+    next_index = 0
+    previous_numbered_match: re.Match[str] | None = None
     line_start = 0
     for line_with_ending in section.splitlines(keepends=True):
         line = line_with_ending.rstrip("\r\n")
         line_end = line_start + len(line)
-        has_numbered_marker = any(
-            line_start <= match.end() <= line_end for match in numbered_matches
-        )
-        previous_numbered_match = next(
-            (match for match in reversed(numbered_matches) if match.end() <= line_start),
-            None,
+
+        # Advance past every marker that ended on or before this line's start;
+        # the last such marker is the one this line may continue.
+        while next_index < len(numbered_matches) and numbered_matches[next_index].end() <= line_start:
+            previous_numbered_match = numbered_matches[next_index]
+            next_index += 1
+
+        has_numbered_marker = (
+            next_index < len(numbered_matches)
+            and numbered_matches[next_index].end() <= line_end
         )
         continues_numbered_item = (
             previous_numbered_match is not None
@@ -353,19 +343,6 @@ def parse_items_flexible(section: str) -> tuple[list[ParsedItem], bool]:
             used_line_fallback = used_line_fallback or is_line_fallback
 
     return items, used_line_fallback
-
-
-def parse_items_by_line(section: str) -> list[ParsedItem]:
-    """Fallback: treat each line holding an answer marker as one statement."""
-
-    items: list[ParsedItem] = []
-    for line in section.split("\n"):
-        if QUESTION_RE.match(line) or is_answer_instruction(line):
-            continue
-        item = build_item(line)
-        if item:
-            items.append(item)
-    return items
 
 
 def is_answer_instruction(line: str) -> bool:
