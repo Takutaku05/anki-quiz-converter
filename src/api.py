@@ -19,7 +19,7 @@ from .api_helpers import (
 )
 from .download_store import DownloadLink, InMemoryDownloadStore
 from .pdf_extractor import PdfExtractionError, extract_pdf_text
-from .quiz_converter import convert_text, extract_deck, remove_ignored_urls
+from .quiz_converter import convert as convert_quiz_text
 from .wordholic_builder import WORDHOLIC_HEADER, build_wordholic_csv
 
 
@@ -108,14 +108,16 @@ def create_app(store: InMemoryDownloadStore | None = None) -> FastAPI:
     @app.post("/api/convert", response_model=ConvertResponse)
     def convert(request: ConvertRequest, http_request: Request) -> ConvertResponse:
         try:
-            cleaned = remove_ignored_urls(request.source)
-            deck = extract_deck(cleaned)
-            tsv = convert_text(request.source)
+            result = convert_quiz_text(request.source)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=japanese_error_message(exc)) from exc
 
+        deck = result.deck
+        tsv = result.tsv
+        # タイトルや問題番号をフォールバック判定した場合の注意を利用者へ伝える。
+        warnings: list[str] = list(result.warnings)
+
         # WordHolic出力は付随機能なので、失敗してもTSV/APKGの変換結果は返す。
-        warnings: list[str] = []
         try:
             wordholic_csv = build_wordholic_csv(tsv)
         except Exception:
