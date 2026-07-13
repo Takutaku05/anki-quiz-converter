@@ -70,6 +70,18 @@ class QuizConverterTests(unittest.TestCase):
         self.assertEqual(result.deck, "微生物学まとめノート")
         self.assertTrue(any("微生物学まとめノート" in w for w in result.warnings))
 
+    def test_generic_title_is_detected_after_leading_metadata(self):
+        source = """2026年度
+生理学（循環）
+問1
+1. 心臓は筋肉でできている。（○）
+"""
+
+        result = convert(source)
+
+        self.assertEqual(result.deck, "生理学::循環")
+        self.assertEqual(result.warnings, [])
+
     def test_default_deck_when_no_usable_title(self):
         source = """問1
 1. 心臓は筋肉でできている。（○）
@@ -107,6 +119,18 @@ Q2
         self.assertIn("アドレナリンはα受容体を刺激する。\t○\t問1", result.tsv)
         self.assertIn("アトロピンはムスカリン受容体を遮断する。\t○\t問2", result.tsv)
 
+    def test_problem_number_in_statement_is_not_a_question_boundary(self):
+        source = """薬理学（テスト）演習問題解答
+問1
+1. この問題2は重要である。（○）
+2. 別の選択肢である。（×）
+"""
+
+        result = convert(source)
+
+        self.assertIn("この問題2は重要である。\t○\t問1", result.tsv)
+        self.assertIn("別の選択肢である。\t×\t問1", result.tsv)
+
     def test_word_answer_markers_are_normalized(self):
         source = """病理学（炎症）演習問題解答
 問1
@@ -131,6 +155,30 @@ Q2
         self.assertIn(WARNING_LINE_BASED_ITEMS, result.warnings)
         self.assertIn("上腕骨は上肢の骨である。\t○\t問1", result.tsv)
         self.assertIn("大腿骨は下肢の骨である。\t○\t問1", result.tsv)
+
+    def test_numbered_and_unnumbered_items_can_be_mixed(self):
+        source = """薬理学（テスト）演習問題解答
+問1
+1. 番号付きの選択肢。（○）
+番号なしの選択肢。（×）
+"""
+
+        result = convert(source)
+
+        self.assertIn("番号付きの選択肢。\t○\t問1", result.tsv)
+        self.assertIn("番号なしの選択肢。\t×\t問1", result.tsv)
+        self.assertIn(WARNING_LINE_BASED_ITEMS, result.warnings)
+
+    def test_line_fallback_ignores_question_instruction_markers(self):
+        source = """薬理学（テスト）演習問題解答
+問1 正しいものに○、誤っているものに×
+番号なしの選択肢。（○）
+"""
+
+        result = convert(source)
+
+        self.assertNotIn("正しいもの", result.tsv)
+        self.assertIn("番号なしの選択肢。\t○\t問1", result.tsv)
 
     def test_answer_prefix_style_is_detected(self):
         source = """公衆衛生（統計）演習問題解答
