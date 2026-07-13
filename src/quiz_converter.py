@@ -33,7 +33,9 @@ GENERIC_TITLE_RE = re.compile(
     r"\s*(?:演習問題解答|演習問題|問題解答|問題集|解答|問題|小テスト|確認テスト|まとめ|テスト)?\s*$"
 )
 QUESTION_RE = re.compile(
-    r"(?:(?<!予想)問題|設問|問|間|(?<![A-Za-z0-9])[QＱ])\s*(?P<number>[0-9０-９]+)\s*[\.．]?"
+    r"(?:(?m:^[ \t　]*(?P<problem_label>問題))"
+    r"|(?P<label>設問|問|間|(?<![A-Za-z0-9])[QＱ]))"
+    r"\s*(?P<number>[0-9０-９]+)\s*[\.．]?"
 )
 ITEM_RE = re.compile(
     r"(?m)(?:(?<!\S)(?P<number_dot>[0-9０-９]{1,2})\s*[\.．]\s*"
@@ -49,6 +51,10 @@ ANSWER_PATTERNS = [
     re.compile(rf"(?:答え|答|正解|解答)\s*[:：]?\s*(?P<answer>{ANSWER_MARK}|正解|正|誤り|誤)"),
     re.compile(rf"(?P<answer>{ANSWER_MARK})\s*$"),
 ]
+ANSWER_INSTRUCTION_RE = re.compile(
+    r"(?:正しい|正解|誤(?:って|り)|間違).*[○〇◯⚪].*[×✕✖]"
+    r"|[○〇◯⚪].*[×✕✖].*(?:記せ|付け|つけ|選べ)"
+)
 
 FULLWIDTH_DIGITS = str.maketrans("０１２３４５６７８９", "0123456789")
 CIRCLE_ANSWERS = {"○", "〇", "◯", "⚪", "正", "正解"}
@@ -145,19 +151,21 @@ def extract_deck_flexible(text: str) -> tuple[str, list[str]]:
         topic = normalize_spaces(match.group("topic"))
         return f"{course}::{topic}", []
 
-    # Pick the first line that reads like a heading (not a numbered item or an
-    # answer line), then try to split it into course（topic）.
-    title_line = first_meaningful_line(document_head(text))
-    if not title_line:
+    # Prefer a course（topic） heading anywhere near the top. Documents often
+    # put metadata such as the school year on the line before the real title.
+    title_lines = meaningful_lines(document_head(text))
+    if not title_lines:
         return DEFAULT_DECK, [WARNING_TITLE_DEFAULT]
 
-    match = GENERIC_TITLE_RE.match(title_line)
-    if match:
-        course = normalize_spaces(match.group("course"))
-        topic = normalize_spaces(match.group("topic"))
-        if course and topic:
-            return f"{course}::{topic}", []
+    for title_line in title_lines:
+        match = GENERIC_TITLE_RE.match(title_line)
+        if match:
+            course = normalize_spaces(match.group("course"))
+            topic = normalize_spaces(match.group("topic"))
+            if course and topic:
+                return f"{course}::{topic}", []
 
+    title_line = title_lines[0]
     return title_line, [WARNING_TITLE_FALLBACK.format(deck=title_line)]
 
 
@@ -174,6 +182,14 @@ def document_head(text: str) -> str:
 def first_meaningful_line(head: str) -> str:
     """Pick the first line that looks like a document title, not an item."""
 
+    lines = meaningful_lines(head)
+    return lines[0] if lines else ""
+
+
+def meaningful_lines(head: str) -> list[str]:
+    """Return plausible heading lines from a document head."""
+
+    lines: list[str] = []
     for line in head.split("\n"):
         candidate = normalize_spaces(line)
         if not candidate:
@@ -184,8 +200,8 @@ def first_meaningful_line(head: str) -> str:
             continue
         if find_answer(candidate):
             continue
-        return candidate[:MAX_FALLBACK_TITLE_LENGTH]
-    return ""
+        lines.append(candidate[:MAX_FALLBACK_TITLE_LENGTH])
+    return lines
 
 
 def parse_cards(text: str) -> list[QuizCard]:
@@ -204,9 +220,9 @@ def parse_cards_flexible(text: str) -> tuple[list[QuizCard], list[str]]:
     sections: list[tuple[str | None, int, str]] = []
     if question_matches:
         for index, question_match in enumerate(question_matches):
-            section_start = question_match.start()
+            section_start = question_label_start(question_match)
             section_end = (
-                question_matches[index + 1].start()
+                question_label_start(question_matches[index + 1])
                 if index + 1 < len(question_matches)
                 else len(normalized)
             )
@@ -227,11 +243,8 @@ def parse_cards_flexible(text: str) -> tuple[list[QuizCard], list[str]]:
         section_round_number = extract_round(section)
         is_prediction = "以下は予想問題" in normalized[max(0, section_start - 20) : section_start]
 
-        items = parse_items(section)
-        if not items:
-            items = parse_items_by_line(section)
-            if items:
-                used_line_fallback = True
+        items, section_used_line_fallback = parse_items_flexible(section)
+        used_line_fallback = used_line_fallback or section_used_line_fallback
 
         for item in items:
             round_number = item.round_number or section_round_number
@@ -244,6 +257,14 @@ def parse_cards_flexible(text: str) -> tuple[list[QuizCard], list[str]]:
     if not cards:
         raise ValueError("no answer choices were found")
     return cards, warnings
+
+
+def question_label_start(match: re.Match[str]) -> int:
+    """Return the start of the actual question label for either regex branch."""
+
+    if match.group("problem_label") is not None:
+        return match.start("problem_label")
+    return match.start("label")
 
 
 def extract_round(section: str) -> str | None:
@@ -288,15 +309,69 @@ def parse_items(section: str) -> list[ParsedItem]:
     return items
 
 
+def parse_items_flexible(section: str) -> tuple[list[ParsedItem], bool]:
+    """Parse numbered items and answer-bearing unnumbered lines in source order."""
+
+    numbered_matches = list(ITEM_RE.finditer(section))
+    candidates: list[tuple[int, int, bool]] = [
+        (match.start(), match.end(), False) for match in numbered_matches
+    ]
+
+    line_start = 0
+    for line_with_ending in section.splitlines(keepends=True):
+        line = line_with_ending.rstrip("\r\n")
+        line_end = line_start + len(line)
+        has_numbered_marker = any(
+            line_start <= match.end() <= line_end for match in numbered_matches
+        )
+        previous_numbered_match = next(
+            (match for match in reversed(numbered_matches) if match.end() <= line_start),
+            None,
+        )
+        continues_numbered_item = (
+            previous_numbered_match is not None
+            and find_answer(section[previous_numbered_match.end() : line_start]) is None
+        )
+        if (
+            not has_numbered_marker
+            and not continues_numbered_item
+            and find_answer(line)
+            and not is_answer_instruction(line)
+            and not QUESTION_RE.match(line)
+        ):
+            candidates.append((line_start, line_start, True))
+        line_start += len(line_with_ending)
+
+    candidates.sort(key=lambda candidate: candidate[0])
+    items: list[ParsedItem] = []
+    used_line_fallback = False
+    for index, (_, content_start, is_line_fallback) in enumerate(candidates):
+        content_end = candidates[index + 1][0] if index + 1 < len(candidates) else len(section)
+        item = build_item(section[content_start:content_end])
+        if item:
+            items.append(item)
+            used_line_fallback = used_line_fallback or is_line_fallback
+
+    return items, used_line_fallback
+
+
 def parse_items_by_line(section: str) -> list[ParsedItem]:
     """Fallback: treat each line holding an answer marker as one statement."""
 
     items: list[ParsedItem] = []
     for line in section.split("\n"):
+        if QUESTION_RE.match(line) or is_answer_instruction(line):
+            continue
         item = build_item(line)
         if item:
             items.append(item)
     return items
+
+
+def is_answer_instruction(line: str) -> bool:
+    """Return whether a line explains how to mark answers rather than being a card."""
+
+    return bool(ANSWER_INSTRUCTION_RE.search(normalize_spaces(line)))
 
 
 def build_item(item_text: str) -> ParsedItem | None:
