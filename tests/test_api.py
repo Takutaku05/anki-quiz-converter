@@ -93,11 +93,22 @@ class ApiTests(unittest.TestCase):
     def test_convert_returns_japanese_error(self):
         response = self.client.post(
             "/api/convert",
-            json={"source": "問1\n1. テスト（○）", "create_download_link": False},
+            json={"source": "薬理学（テスト）演習問題解答\n問1\n1. 解答記号なし", "create_download_link": False},
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "タイトルからデッキ名を抽出できません。")
+        self.assertEqual(response.json()["detail"], "解答選択肢が見つかりません。")
+
+    def test_convert_without_title_uses_fallback_deck_with_warning(self):
+        response = self.client.post(
+            "/api/convert",
+            json={"source": "問1\n1. テスト（○）", "create_download_link": False},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertGreater(data["card_count"], 0)
+        self.assertTrue(data["warnings"])
 
     def test_extract_pdf_returns_text(self):
         with open(SAMPLE_PDF, "rb") as handle:
