@@ -1,18 +1,29 @@
 # Anki Quiz Converter Web
 
-薬理学の演習問題解答テキストをAnkiインポート用TSVとWordHolic用CSVに変換するWebアプリです。
+薬理学の演習問題解答テキスト（またはPDF）を、Ankiインポート用TSV・WordHolic用CSV・Ankiデッキ（.apkg）に変換するWebアプリです。
 
-## 構成
+- **入力**: `問1` 形式の◯×問題テキスト、または文字が埋め込まれたPDF
+- **出力**: Anki TSV / WordHolic CSV（画面でコピー・保存）、.apkg（期限付きダウンロードリンク＋QRコード）
+- **構成**: FastAPI バックエンド（Render）＋ React/Vite フロントエンド（Cloudflare Pages）
 
-- `src/quiz_converter.py`: 既存の変換ロジック
-- `src/wordholic_builder.py`: Anki TSVからWordHolic CSVを生成するロジック
-- `src/pdf_extractor.py`: アップロードされたPDFからテキストを抽出するロジック（pypdf）
-- `src/api.py`: FastAPI API
-- `src/download_store.py`: 変換した.apkgをサーバーメモリに一時保存し、トークン付きURLで配信
-- `web/`: Cloudflare Pages向けReact/Viteフロントエンド
-- `tests/`: 標準ライブラリ `unittest` で走る最低限のテスト
+## ディレクトリ構成
+
+| パス | 内容 |
+| --- | --- |
+| `src/quiz_converter.py` | 変換ロジック本体（タイトル・問題・解答の柔軟な判定、CLIあり） |
+| `src/wordholic_builder.py` | Anki TSVからWordHolic用CSV（5列）を生成 |
+| `src/apkg_builder.py` | Anki TSVから.apkgを生成（genanki、決定的なデッキID/GUID） |
+| `src/pdf_extractor.py` | PDFからのテキスト抽出（pypdf、CJK間の不要スペース除去） |
+| `src/api.py` | FastAPI アプリ（CORS、エラーログ、各エンドポイント） |
+| `src/api_helpers.py` | 日本語エラーメッセージ・ダウンロードファイル名の生成 |
+| `src/download_store.py` | .apkgをサーバーメモリに一時保存し、トークン付きURLで配信 |
+| `web/` | Cloudflare Pages向け React/Vite フロントエンド |
+| `tests/` | 標準ライブラリ `unittest` で走るテスト |
+| `example/` | サンプル一式（`sauce/`: 入力テキスト・PDF、`output/`: 変換結果のTSV/CSV） |
 
 ## ローカル起動
+
+バックエンド（`http://localhost:8000`）:
 
 ```bash
 python3 -m venv .venv
@@ -21,59 +32,53 @@ pip install -r requirements.txt
 uvicorn src.api:app --reload
 ```
 
-別ターミナルでフロントエンドを起動します。
+フロントエンド（別ターミナル、`http://localhost:5173`）:
 
 ```bash
 cd web
 npm install
-cp .env.example .env
+cp .env.example .env   # VITE_API_BASE_URL=http://localhost:8000
 npm run dev
 ```
 
-ブラウザで `http://localhost:5173` を開きます。
-
-## 期限付きダウンロードリンク
-
-`POST /api/convert` はAnki TSVとWordHolic CSVを返します。APKGリンク作成が有効な場合は、APKGをサーバーメモリに一時保存し、`GET /api/download/{token}` のURLも返します。外部ストレージ（R2など）は不要です。
-
-- リンクの有効期限は `DOWNLOAD_LINK_TTL_SECONDS`（デフォルト30分）
-- サーバー再起動やスリープ（Render無料プラン）でリンクは無効になります。その場合は再変換してください
-- フロントエンドはURLのQRコードを表示するので、PCで変換してスマホのAnkiアプリでインポートできます
-- WordHolic CSVは `FrontText,BackText,Comment,FrontTextLanguage,BackTextLanguage` の5列で生成します
-
-必要な環境変数:
+変換ロジックだけをCLIで試すこともできます:
 
 ```bash
-CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,https://your-pages-domain.pages.dev
-
-# プロキシ配下（Renderなど）ではダウンロードURLの組み立てに使うため明示推奨
-PUBLIC_BASE_URL=https://your-api-domain.example.com
-DOWNLOAD_LINK_TTL_SECONDS=1800
-DOWNLOAD_MAX_ENTRIES=100
+python3 src/quiz_converter.py "example/sauce/アレルギー疾患治療薬.txt"
 ```
 
-リンクはトークン付きURLです。リンクを知っている人は、有効期限内であればファイルをダウンロードできます。
+## 環境変数（バックエンド）
 
-## Cloudflare Pages
+`.env.example` 参照。
 
-Cloudflare Pagesには `web/` をデプロイします。
-
-- Build command: `npm run build`
-- Build output directory: `dist`
-- Root directory: `web`
-- Environment variable: `VITE_API_BASE_URL=https://your-api-domain.example.com`
-
-## FastAPIデプロイ
-
-`render.yaml` を追加しています。Renderにデプロイする場合は、`CORS_ORIGINS` と `PUBLIC_BASE_URL` を設定してください。
-
-start command:
-
-```bash
-uvicorn src.api:app --host 0.0.0.0 --port $PORT
-```
+| 変数 | デフォルト | 説明 |
+| --- | --- | --- |
+| `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | 許可するオリジン（カンマ区切り） |
+| `PUBLIC_BASE_URL` | （リクエストURLから推測） | ダウンロードURLの組み立てに使用。プロキシ配下（Renderなど）では明示推奨 |
+| `DOWNLOAD_LINK_TTL_SECONDS` | `1800`（30分） | ダウンロードリンクの有効期限 |
+| `DOWNLOAD_MAX_ENTRIES` | `100` | メモリに保持する.apkgの最大件数（超過分は古い順に削除） |
+| `LOG_LEVEL` | `INFO` | APIのログレベル |
 
 ## API
+
+### `GET /api/health`
+
+死活確認。`{"status": "ok"}` を返します。
+
+### `GET /api/capabilities`
+
+フロントエンドが機能の有無を判定するためのエンドポイント。
+
+```json
+{
+  "apkg_download_links_enabled": true,
+  "link_ttl_seconds": 1800
+}
+```
+
+### `POST /api/convert`
+
+テキストを変換します。
 
 ```http
 POST /api/convert
@@ -109,28 +114,19 @@ Content-Type: application/json
 }
 ```
 
-`GET /api/download/{token}` は有効期限内であれば.apkgバイナリを返します。期限切れ・不明トークンは404と日本語メッセージを返します。
+- `create_download_link: true` の場合、.apkgをサーバーメモリに一時保存し、`downloads.apkg` にトークン付きURLを返します。外部ストレージ（R2など）は不要です
+- 変換に失敗した場合は400と日本語メッセージ（例: `解答選択肢が見つかりません。`）を返します
+- WordHolic CSVの生成に失敗しても変換自体は成功し、`warnings` で通知します
 
-変換失敗時は日本語メッセージを返します。
+### `GET /api/download/{token}`
 
-- `解答選択肢が見つかりません。`
+有効期限内であれば.apkgバイナリを返します。期限切れ・不明トークンは404と日本語メッセージを返します。
 
-問題番号（`問1` など）が見つからない場合は失敗せず、`warnings` で通知して変換を続行します。
+- リンクを知っている人は有効期限内であれば誰でもダウンロードできます
+- サーバー再起動やスリープ（Render無料プラン）でリンクは無効になります。その場合は再変換してください
+- フロントエンドはURLのQRコードを表示するので、PCで変換してスマホのAnkiアプリでインポートできます
 
-### タイトル・問題・解答の柔軟な判定
-
-`演習問題解答` という定型タイトルがなくても変換できます。判定は次の優先順位で行い、フォールバックした場合は `warnings` に日本語の注意を載せて返します（フロントエンドにも表示されます）。
-
-- **タイトル / デッキ名**
-  1. `…（…）演習問題解答` の厳密形式
-  2. 冒頭付近の `科目（単元）` 形式（`演習問題`・`問題集`・`小テスト`・`まとめ` などの語尾、または語尾なしでも可）→ `科目::単元`
-  3. 上記に当てはまらない場合は先頭の見出し行をデッキ名に使用（警告あり）
-  4. 見出しも取れない場合はデッキ名 `変換デッキ`（警告あり）
-- **問題番号**: `問1` に加えて `問題1` `設問1` `Q1`（全角も可）を認識。番号が無くても変換は続行（警告あり）
-- **解答記号**: `（○）`（○〇◯／×✕✖）に加えて、`（正）`『（誤）』などの語、`答え：○` のような接頭辞、行末の記号も認識
-- **選択肢**: 番号付き（`1.` など）が無い箇所は、行ごとに「文＋解答記号」を判定するフォールバックを使用（警告あり）
-
-### PDFからのテキスト抽出
+### `POST /api/extract-pdf`
 
 テキスト入力の代わりにPDFをアップロードして、抽出したテキストを変換元にできます。抽出結果は変換前に画面のテキスト欄で確認・修正できます。
 
@@ -154,12 +150,62 @@ file=<PDFファイル>
 - **文字が埋め込まれたPDFのみ対応**します。スキャン画像や写真のPDF（テキスト層がないPDF）は非対応で、OCRは行いません
 - アップロード上限は10MB、ページ数上限は50ページです
 
-エラー時は422（PDF処理失敗）・413（サイズ超過）・400（PDF以外）で日本語メッセージを返します。
+エラー時は400（PDF以外）・413（サイズ超過）・422（PDF処理失敗）で日本語メッセージを返します。
 
-- `パスワード付き（暗号化された）PDFには対応していません。…`（暗号化PDF）
-- `PDFから文字を抽出できませんでした。画像として保存されたPDF（スキャンや写真）には対応していません。…`（テキスト層なし）
-- `ページ数が多すぎます。50ページ以下のPDFをアップロードしてください。`（ページ数上限超過）
-- `PDFを読み取れませんでした。ファイルが壊れていないか確認してください。`（破損など）
+| 状況 | ステータス | メッセージ |
+| --- | --- | --- |
+| PDF以外のファイル | 400 | `PDFファイルを選択してください。` |
+| 10MB超過 | 413 | `ファイルサイズが大きすぎます。…` |
+| 暗号化PDF | 422 | `パスワード付き（暗号化された）PDFには対応していません。…` |
+| テキスト層なし | 422 | `PDFから文字を抽出できませんでした。画像として保存されたPDF…` |
+| 50ページ超過 | 422 | `ページ数が多すぎます。50ページ以下のPDFをアップロードしてください。` |
+| 破損など | 422 | `PDFを読み取れませんでした。ファイルが壊れていないか確認してください。` |
+
+## 変換の仕様
+
+### タイトル・問題・解答の柔軟な判定
+
+`演習問題解答` という定型タイトルがなくても変換できます。判定は次の優先順位で行い、フォールバックした場合は `warnings` に日本語の注意を載せて返します（フロントエンドにも表示されます）。
+
+- **タイトル / デッキ名**
+  1. `…（…）演習問題解答` の厳密形式
+  2. 冒頭付近の `科目（単元）` 形式（`演習問題`・`問題集`・`小テスト`・`まとめ` などの語尾、または語尾なしでも可）→ `科目::単元`
+  3. 上記に当てはまらない場合は先頭の見出し行をデッキ名に使用（警告あり）
+  4. 見出しも取れない場合はデッキ名 `変換デッキ`（警告あり）
+- **問題番号**: `問1` に加えて `問題1` `設問1` `Q1`（全角も可）を認識。番号が無くても変換は続行（警告あり）
+- **解答記号**: `（○）`（○〇◯／×✕✖）に加えて、`（正）`『（誤）』などの語、`答え：○` のような接頭辞、行末の記号も認識
+- **選択肢**: 番号付き（`1.` など）が無い箇所は、行ごとに「文＋解答記号」を判定するフォールバックを使用（警告あり）
+
+### 出力の補足
+
+- カードのタグ列には `問N` に加えて、`第N回` の記載や `以下は予想問題` の直後の問題を検出して `第N回` / `予想問題` タグを付けます
+- 解答記号の後ろに続く文（`※註：…` など）は、カード表面の末尾に註として付加します
+- 入力中のURL（NotebookLMの画像URLなど）は変換前に除去します
+- WordHolic CSVは `FrontText,BackText,Comment,FrontTextLanguage,BackTextLanguage` の5列・CRLF区切りで生成します
+- .apkgのデッキID・ノートGUIDはデッキ名とカード内容から決定的に生成するため、再変換して再インポートしても重複しません
+
+## デプロイ
+
+### Cloudflare Pages（フロントエンド）
+
+`web/` をデプロイします。
+
+- Build command: `npm run build`
+- Build output directory: `dist`
+- Root directory: `web`
+- Environment variable: `VITE_API_BASE_URL=https://your-api-domain.example.com`
+
+### Render（バックエンド）
+
+`render.yaml` にBlueprint定義があります（Python 3.12 / freeプラン）。`CORS_ORIGINS` と `PUBLIC_BASE_URL` はダッシュボードで設定してください。
+
+start command:
+
+```bash
+uvicorn src.api:app --host 0.0.0.0 --port $PORT
+```
+
+デプロイ設定を変更した場合は `DEPLOY_NOTES.md` に記載します。
 
 ## テスト
 
